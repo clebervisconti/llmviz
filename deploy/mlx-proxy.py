@@ -33,9 +33,12 @@ class Handler(BaseHTTPRequestHandler):
         up = conn_cls(_U.netloc, timeout=600)
         try:
             up.putrequest(method, self.path, skip_host=False, skip_accept_encoding=True)
-            for k, v in self.headers.items():
-                if k.lower() not in _HOP:
-                    up.putheader(k, v)
+            # Send a CLEAN, minimal header set. Do NOT forward the client's User-Agent /
+            # Accept-Encoding / cookies — Cloudflare's bot protection 502s on python-httpx's
+            # default headers. Only what the upstream OpenAI API needs.
+            up.putheader("Content-Type", self.headers.get("Content-Type", "application/json"))
+            up.putheader("Accept", self.headers.get("Accept", "application/json"))
+            up.putheader("User-Agent", "LLMViz-Proxy/1.0")
             up.putheader("CF-Access-Client-Id", CF_ID)
             up.putheader("CF-Access-Client-Secret", CF_SECRET)
             if body is not None:
