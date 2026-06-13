@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LLMViz · Watch a Language Model Think · Cleber Visconti</title>
-  <link rel="icon" type="image/png" href="/static/img/cv-monogram.png">
-  <link rel="stylesheet" href="/static/css/style.css?v=5">
+  <link rel="icon" type="image/png" href="/static/img/cs-icon.png?v=6">
+  <link rel="stylesheet" href="/static/css/style.css?v=6">
 </head>
 <body class="cv-theme">
   <canvas id="bgfx"></canvas>
@@ -13,7 +13,7 @@
   <header class="topbar">
     <div class="brand">
       <a href="https://clebervisconti.com" target="_blank" rel="noopener">
-        <img src="/static/img/cv-wordmark.png" alt="cleber visconti" class="logo">
+        <img src="/static/img/cs-icon.png?v=6" alt="CYBERSPHERE" class="logo logo-icon">
       </a>
       <span class="divider"></span>
       <span class="product">LLM<span class="accent">VIZ</span></span>
@@ -29,6 +29,14 @@
     <section class="panel left">
       <h2 class="panel-title">// PROMPT</h2>
       <textarea class="prompt-box" id="prompt" rows="3" spellcheck="false">The cat sat on the</textarea>
+
+      <div class="tok-readout">
+        <div class="tok-head">
+          <span class="muted small">tokenized <span class="hint" id="tok-engine"></span></span>
+          <span class="tok-count" id="tok-count"></span>
+        </div>
+        <div class="token-view" id="token-view"><span class="muted" style="font-size:11px">type a prompt…</span></div>
+      </div>
 
       <div class="samples">
         <p class="muted small">or try a sample:</p>
@@ -113,9 +121,9 @@
     <span>cleber visconti · ai/ml classroom demo · <a href="https://clebervisconti.com">clebervisconti.com</a> · sibling of <a href="https://neuralnetviz.clebervisconti.com">NeuraNetViz</a></span>
   </footer>
 
-  <script src="/static/js/bgfx.js?v=5"></script>
-  <script src="/static/js/viz.js?v=5"></script>
-  <script src="/static/js/attention.js?v=5"></script>
-  <script src="/static/js/controls.js?v=5"></script>
+  <script src="/static/js/bgfx.js?v=6"></script>
+  <script src="/static/js/viz.js?v=6"></script>
+  <script src="/static/js/attention.js?v=6"></script>
+  <script src="/static/js/controls.js?v=6"></script>
 </body>
 </html>

@@ -82,8 +82,9 @@
       badge.title = m.blurb;
       badge.classList.toggle("scripted", m.id === "demo" || !m.available);
     }
-    // reset run for the new geometry
+    // reset run for the new geometry; re-tokenize (tokenizers differ per model)
     resetRun();
+    refreshTokens();
   }
 
   // ---------- rendering ----------
@@ -127,6 +128,49 @@
   // accumulate generated token texts (we stored them during the run)
   const genText = [];
   function collectGenText() { return genText.join(""); }
+
+  // ---------- live tokenizer view (Tokenizer-Playground style) ----------
+  // muted palette so adjacent tokens are clearly distinct on the dark UI
+  const TOK_PALETTE = [
+    "rgba(40,214,0,0.26)", "rgba(80,200,255,0.22)", "rgba(255,209,102,0.22)",
+    "rgba(255,120,180,0.20)", "rgba(160,140,255,0.24)", "rgba(0,200,160,0.24)",
+  ];
+  let tokTimer, tokReq = 0;
+  async function refreshTokens() {
+    const view = $("token-view");
+    const prompt = state.prompt || "";
+    const m = state.models.find((x) => x.id === state.model);
+    $("tok-engine").textContent = m ? "· " + m.label : "";
+    if (!prompt.trim()) {
+      view.innerHTML = '<span class="muted" style="font-size:11px">type a prompt…</span>';
+      $("tok-count").textContent = "";
+      return;
+    }
+    const myReq = ++tokReq;
+    try {
+      const data = await api("/api/tokenize", { prompt, model: state.model });
+      if (myReq !== tokReq) return;                 // a newer request superseded this one
+      const toks = data.tokens || [];
+      view.innerHTML = "";
+      toks.forEach((t, i) => {
+        const span = document.createElement("span");
+        span.className = "tok";
+        span.style.background = TOK_PALETTE[i % TOK_PALETTE.length];
+        const txt = (t.text || "");
+        if (/\n/.test(txt)) {                        // show newlines explicitly
+          span.innerHTML = escapeHtml(txt.replace(/\n/g, "↵\n")).replace(/↵/g, '<span class="tok-nl">↵</span>');
+        } else {
+          span.textContent = txt;
+        }
+        span.title = "token id " + t.id;
+        view.appendChild(span);
+      });
+      $("tok-count").textContent = toks.length + (toks.length === 1 ? " token" : " tokens");
+    } catch (e) {
+      if (myReq === tokReq) { view.innerHTML = '<span class="muted" style="font-size:11px">tokenizer unavailable</span>'; $("tok-count").textContent = ""; }
+    }
+  }
+  function debouncedTokens() { clearTimeout(tokTimer); tokTimer = setTimeout(refreshTokens, 250); }
 
   function renderAll(data, animate) {
     const svg = $("pipeline");
@@ -203,12 +247,12 @@
       const b = document.createElement("button");
       b.textContent = p.length > 22 ? p.slice(0, 22) + "…" : p;
       b.title = p;
-      b.addEventListener("click", () => { $("prompt").value = p; state.prompt = p; resetRun(); });
+      b.addEventListener("click", () => { $("prompt").value = p; state.prompt = p; resetRun(); refreshTokens(); });
       sr.appendChild(b);
     });
 
-    $("prompt").addEventListener("input", (e) => { state.prompt = e.target.value; });
-    $("prompt").addEventListener("change", () => resetRun());
+    $("prompt").addEventListener("input", (e) => { state.prompt = e.target.value; debouncedTokens(); });
+    $("prompt").addEventListener("change", () => { resetRun(); refreshTokens(); });
 
     $("temp").addEventListener("input", (e) => {
       state.temp = parseFloat(e.target.value); $("temp-out").textContent = state.temp.toFixed(2);
