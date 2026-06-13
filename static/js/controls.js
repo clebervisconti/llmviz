@@ -16,7 +16,7 @@
   const state = {
     models: [], model: "demo", temp: 0.8, topk: 10,
     prompt: "The cat sat on the",
-    generated: [], lastStep: null, running: false, runToken: 0,
+    generated: [], lastStep: null, running: false, runToken: 0, epoch: 0,
     attnLayer: 0, attnMode: "mean", // "mean" | "single"
   };
 
@@ -199,6 +199,7 @@
 
   // ---------- generation ----------
   function resetRun() {
+    state.epoch++;   // cancel any in-flight step/autoplay so stale renders are ignored
     state.generated = []; state.lastStep = null; genText.length = 0; state.running = false;
     $("predictions").innerHTML = '<li class="empty">run to see the next-token distribution</li>';
     $("step-counter").textContent = "";
@@ -209,10 +210,12 @@
   }
 
   async function doStep(animate, silent) {
+    const myEpoch = state.epoch;   // if the model/prompt changes mid-flight, drop this result
     try {
       if (!silent) status("running forward pass…", "busy");
       const data = await api("/api/generate_step", stepBody(
         state.attnMode === "single" ? { head: 0, focus_layer: state.attnLayer } : {}));
+      if (myEpoch !== state.epoch) return null;   // superseded — ignore stale render
       state.lastStep = data;
       // record generated token text (only when actually advancing, not the silent preview)
       if (!silent) { genText.push(data.sampled.text); state.generated.push(data.sampled.id); }
@@ -220,6 +223,7 @@
       if (!silent) status(data.done ? `done · ${data.tokens.length} tokens` : "token added — step again or keep going", "ok");
       return data;
     } catch (e) {
+      if (myEpoch !== state.epoch) return null;   // error from a superseded request — ignore
       status("error: " + e.message, "err");
       throw e;
     }
@@ -235,7 +239,7 @@
       for (let i = 0; i < MAX; i++) {
         if (!state.running || myToken !== state.runToken) break;
         const data = await doStep(true, false);
-        if (data.done) break;
+        if (!data || data.done) break;   // null = superseded by a model/prompt switch
         if (!reduced) await sleep(450);
       }
     } finally {
