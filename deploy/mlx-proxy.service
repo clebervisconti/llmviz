@@ -1,0 +1,20 @@
+# Installed at /etc/systemd/system/mlx-proxy.service on the HostGator VPS.
+# Localhost-only auth proxy: injects CF-Access service-token headers so OpenAI clients
+# (Hermes, etc.) can use the MLX/Gemma endpoint via http://127.0.0.1:8083/v1.
+[Unit]
+Description=MLX Access proxy (CF-Access header injector for the Gemma endpoint)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=/var/lib/llmviz/mlx.env
+Environment=MLX_PROXY_PORT=8083
+ExecStart=/usr/bin/python3 /usr/local/lib/mlx-proxy/mlx-proxy.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
