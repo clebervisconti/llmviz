@@ -36,7 +36,10 @@ MODELS = [
      "blurb": "GPT-2 medium — 355M params, 24 layers. Loaded on demand."},
 ]
 MODELS_BY_ID = {m["id"]: m for m in MODELS}
-RESIDENT = {"nano", "micro"}   # kept loaded; others lazy-loaded then freed
+# On the shared 4GB VPS, keep at most ONE live model resident at a time (~650MB each).
+# Switching tiers unloads the previous model. Benchmarked 2026-06-13: distilgpt2 654MB/46ms,
+# gpt2 634MB/452ms per forward pass with attentions; gpt2-medium left scripted (too tight).
+MAX_RESIDENT = 1
 
 
 def torch_available() -> bool:
@@ -90,6 +93,7 @@ class ModelManager:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
+        torch.set_num_threads(2)          # match the 2-vCPU box; predictable CPU use
         tok = AutoTokenizer.from_pretrained(spec["hf"])
         model = AutoModelForCausalLM.from_pretrained(
             spec["hf"], attn_implementation="eager"   # eager attn so output_attentions works
@@ -97,11 +101,11 @@ class ModelManager:
         model.eval()
         torch.set_grad_enabled(False)
 
-        # Free non-resident tiers before caching a new lazy one, to bound memory.
-        if spec.get("lazy"):
+        # Keep only MAX_RESIDENT models in memory: evict the others before caching this one.
+        if len(self._cache) >= MAX_RESIDENT:
             for k in list(self._cache):
-                if k not in RESIDENT:
-                    del self._cache[k]
+                del self._cache[k]
+            import gc; gc.collect()
         self._cache[tier] = (tok, model)
         return self._cache[tier]
 

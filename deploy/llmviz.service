@@ -12,6 +12,11 @@ WorkingDirectory=/var/lib/llmviz/repo
 Environment=PATH=/var/lib/llmviz/venv/bin:/usr/bin
 # HF model cache lives off the repo so git pulls don't wipe it
 Environment=HF_HOME=/var/lib/llmviz/hf-cache
+Environment=OMP_NUM_THREADS=2
+# Live tiers enabled after benchmarking (2026-06-13): NANO + MICRO fit (~650MB, <0.5s/fwd).
+# SMALL (gpt2-medium) left OFF — too tight on this shared 4GB box; it serves the scripted engine.
+Environment=LLMVIZ_LIVE=1
+Environment=LLMVIZ_LIVE_TIERS=nano,micro
 ExecStart=/var/lib/llmviz/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8802 --workers 1
 Restart=on-failure
 RestartSec=5
