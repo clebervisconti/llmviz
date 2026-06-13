@@ -78,11 +78,20 @@
 > - To change live tiers: edit `LLMVIZ_LIVE` / `LLMVIZ_LIVE_TIERS` in the systemd unit, `daemon-reload`, restart.
 > - Update pipeline: `cd /var/lib/llmviz/repo && git pull && systemctl restart llmviz`.
 
-## Phase 5 — Polish & teaching pass  *(small)*
-- [ ] Tooltip copy review for beginner clarity (align with `docs/RESEARCH.md §e` narrative).
-- [ ] Mobile stacked layout check; keyboard/contrast/reduced-motion accessibility pass.
+## Phase 5 — Polish & teaching pass  *(in progress)*
+- [x] **Embeddings stage made teachable** (2026-06-13): each token shown as a labeled point in
+      "meaning space" with cross-hair axes + caption; tooltip explains "token → vector of N
+      numbers". Honest caption: "illustrative (DEMO)" vs "the model's learned meaning space" on
+      live tiers. Verified live (DistilGPT-2 shows real clustering, e.g. cat≈sat).
+- [x] **Cache-control fix**: `index.html` now `no-store` so asset-version bumps deploy instantly
+      (was being cached 7 days by OLS/CF).
+- [x] **Model-fit re-verified** for the micro VPS: 8-step live NANO load test held at ~760MB
+      (peak 839MB ≪ 2G cap), 0 OOM restarts, other sites unaffected. NANO is the safe default;
+      MICRO also fits; SMALL stays scripted.
+- [x] reduced-motion guards in place; controls are native (keyboard-accessible); green-on-dark
+      is high-contrast. Responsive grid stacks at ≤1100px.
 - [ ] README screenshots; short "how to use in a lecture" note.
-- [ ] Optional: Claude Code Stop-hook auto-sync (AgentOS pattern) or cron git-pull on the VPS.
+- [ ] Optional: cron git-pull on the VPS or Stop-hook auto-sync (AgentOS pattern).
 - **Done when:** Cleber signs off after a dry-run lecture.
 
 ## Backlog / v2 ideas
