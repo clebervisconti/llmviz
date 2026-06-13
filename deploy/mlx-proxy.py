@@ -46,15 +46,15 @@ class Handler(BaseHTTPRequestHandler):
             resp = up.getresponse()
 
             self.send_response(resp.status)
-            chunked = False
             for k, v in resp.getheaders():
-                kl = k.lower()
-                if kl in _HOP:
+                if k.lower() in _HOP:
                     continue
-                if kl == "content-length":
-                    pass  # keep as-is for non-streamed
                 self.send_header(k, v)
-            # stream the body through (works for SSE and normal responses)
+            # Delimit the body by closing the connection at EOF. This is correct whether the
+            # upstream used Content-Length OR chunked (http.client de-chunks for us, and we
+            # strip transfer-encoding) — and it works for SSE (stream=true) too.
+            self.send_header("Connection", "close")
+            self.close_connection = True
             self.end_headers()
             while True:
                 chunk = resp.read(8192)
