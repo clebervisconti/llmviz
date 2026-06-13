@@ -123,20 +123,26 @@ async def generate_step(req: GenerateReq):
         )
         out["engine"] = "scripted"
         return out
-    if _infer_lock.locked():
-        raise HTTPException(429, "model busy — try again in a moment")
-    async with _infer_lock:
-        try:
-            from . import inference
-            out = await asyncio.to_thread(   # blocking CPU forward pass off the event loop
-                inference.generate_step,
-                prompt, req.model, req.temperature, req.top_k,
-                req.generated, req.head, req.focus_layer,
-            )
-            out["engine"] = "live"
-            return out
-        except Exception as e:  # noqa: BLE001
-            raise HTTPException(500, f"generation failed: {e}")
+    # Queue (don't reject) when another inference is in flight — one model runs at a
+    # time on this box, but callers wait their turn rather than seeing a "busy" error.
+    # Bounded so a stuck request can't hang the UI forever.
+    try:
+        await asyncio.wait_for(_infer_lock.acquire(), timeout=45)
+    except asyncio.TimeoutError:
+        raise HTTPException(503, "model warming up — try again in a moment")
+    try:
+        from . import inference
+        out = await asyncio.to_thread(   # blocking CPU forward pass off the event loop
+            inference.generate_step,
+            prompt, req.model, req.temperature, req.top_k,
+            req.generated, req.head, req.focus_layer,
+        )
+        out["engine"] = "live"
+        return out
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"generation failed: {e}")
+    finally:
+        _infer_lock.release()
 
 
 @app.get("/")

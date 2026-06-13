@@ -21,12 +21,18 @@
   };
 
   // ---------- API ----------
-  async function api(path, body) {
+  async function api(path, body, _tries) {
     const res = await fetch(path, {
       method: body ? "POST" : "GET",
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
     });
+    // transient "busy/warming up" — wait a beat and retry rather than erroring at the user
+    if ((res.status === 429 || res.status === 503) && (_tries || 0) < 3) {
+      status("warming up the model…", "busy");
+      await sleep(1500);
+      return api(path, body, (_tries || 0) + 1);
+    }
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
     return res.json();
   }
