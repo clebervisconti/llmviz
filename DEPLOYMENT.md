@@ -1,5 +1,11 @@
 # LLMViz — Deployment runbook
 
+> ✅ **DEPLOYED 2026-06-13** → https://llmviz.cybersphere.com.br (DEMO default; live NANO+MICRO
+> real GPT-2; SMALL scripted). Repo: https://github.com/clebervisconti/llmviz. The steps below
+> are the as-built record. Benchmarks: DistilGPT-2 654MB/46ms, GPT-2 634MB/452ms per forward pass
+> (with attentions) on the 2-vCPU box. LLMViz cgroup peak ~770MB, capped at 2G. `MAX_RESIDENT=1`.
+
+
 > Pattern: **Shape B — dynamic app behind OLS reverse proxy** (same as NeuraNetViz, same
 > playbook as AgentOS `DEPLOYMENT.md`). Skills that own each step: `cs-app-deployment`
 > (pipeline), `hostgator-vps-manager` (server), `cloudflare-manager` (DNS/edge).

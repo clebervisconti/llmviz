@@ -54,16 +54,29 @@
 > NOT YET DONE on a real model: install torch+transformers on the VPS and confirm live tiers +
 > attention shapes + latency (Phase 4). Until then live tiers serve the scripted engine.
 
-## Phase 4 — Deploy & harden  *(medium)* — see `DEPLOYMENT.md`
-- [ ] `deploy/llmviz.service` (uvicorn :8802, `MemoryMax=2G`, Restart=on-failure).
-- [ ] `gh repo create llmviz --public` and push.
-- [ ] DNS via `cloudflare-manager`; VPS clone + CPU torch venv via `hostgator-vps-manager`;
-      OLS reverse proxy + LE cert (DNS-01); systemd enable.
-- [ ] **Benchmark on the VPS**: measure MICRO step latency + RSS; if too slow/heavy, set NANO
-      as default and/or drop SMALL.
-- [ ] Run `DEPLOYMENT.md` post-deploy checklist; add to AgentOS project registry.
-- **Done when:** `https://<subdomain>/api/health` is green and a full lesson runs in the browser
-      without stalling or breaching MemoryMax.
+## Phase 4 — Deploy & harden  *(medium)* ✅ DONE — see `DEPLOYMENT.md`
+- [x] `deploy/llmviz.service` (uvicorn :8802, `MemoryMax=2G`, Restart=on-failure, enabled at boot).
+- [x] `gh repo create llmviz --public` and push → https://github.com/clebervisconti/llmviz
+- [x] DNS: proxied A record `llmviz.cybersphere.com.br` → 129.121.49.96 (Cloudflare).
+- [x] VPS: `/var/lib/llmviz/{repo,venv}`; CPU torch 2.8 + transformers 4.57 installed.
+- [x] OLS reverse proxy via CyberPanel `createChild` + `issueSSL` (HTTP-01 cert), then vhost.conf
+      rewritten to proxy → 127.0.0.1:8802. **NOT** the manual `httpd_config.conf` edit — CyberPanel
+      did the risky config so the box's other 5 sites stayed safe.
+- [x] **Benchmarked on the VPS** (in a memory-capped cgroup scope so it couldn't OOM the box):
+      DistilGPT-2 (NANO) **654MB / 46ms**, GPT-2 (MICRO) **634MB / 452ms** per forward pass with
+      attentions. Both enabled live; **SMALL (gpt2-medium) left scripted** — box too tight
+      (only ~750MB free, swap full). `MAX_RESIDENT=1` (one model at a time) keeps LLMViz ≤~770MB.
+- [x] Post-deploy checks: public `/api/health` green (`live:true`), live NANO+MICRO return real
+      next-token distributions, DEMO + scripted SMALL work, NeuraNetViz + WordPress unaffected.
+- **Done:** https://llmviz.cybersphere.com.br is live (DEMO default, real GPT-2 on NANO/MICRO). ✅
+
+> ⚠ Operational notes for future edits:
+> - The proxy lives in `/usr/local/lsws/conf/vhosts/llmviz.cybersphere.com.br/vhost.conf`
+>   (backed up under `/home/backups/llmviz/`). If you re-issue SSL via the CyberPanel UI it may
+>   rewrite this file — re-apply the proxy context/extprocessor afterward.
+> - Cert auto-renews via CyberPanel/acme (acme-challenge context is in the vhost).
+> - To change live tiers: edit `LLMVIZ_LIVE` / `LLMVIZ_LIVE_TIERS` in the systemd unit, `daemon-reload`, restart.
+> - Update pipeline: `cd /var/lib/llmviz/repo && git pull && systemctl restart llmviz`.
 
 ## Phase 5 — Polish & teaching pass  *(small)*
 - [ ] Tooltip copy review for beginner clarity (align with `docs/RESEARCH.md §e` narrative).

@@ -23,7 +23,9 @@ FastAPI + PyTorch (CPU) + HuggingFace `transformers` backend · vanilla JS + SVG
 NeuraNetViz exactly.
 
 ## Status
-📐 **Design complete (research + PM docs). Development not started.**
+🟢 **Live: https://llmviz.cybersphere.com.br** (Phases 0–4 done; polish/Phase 5 remaining).
+DEMO scripted walkthrough is the default; NANO (DistilGPT-2) and MICRO (GPT-2) run the real
+model on the VPS; SMALL is scripted (kept off the shared box for memory).
 Built by Cleber Visconti with Claude Code — researched/designed with Fable 5, developed with Opus.
 
 ## Docs map
