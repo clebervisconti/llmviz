@@ -42,6 +42,7 @@
       prompt: state.prompt, model: state.model,
       temperature: state.temp, top_k: state.topk,
       generated: state.generated.slice(),
+      generated_text: genText.join(""),   // used by the GEMMA/MLX tier
     }, extra || {});
   }
 
@@ -133,7 +134,11 @@
     if (m) data.dim = m.dim;   // let the embeddings tooltip name the real vector size
     const groups = window.LLMViz.pipeline.render(svg, data);
     renderPredictions(data);
-    renderAttentionControls(data);
+    // some backends (GEMMA/MLX) can't expose attention — hide the panel, show the note
+    const caps = data.caps || { attention: true, embeddings: true };
+    $("attn-section").style.display = caps.attention ? "" : "none";
+    $("attn-note").style.display = caps.attention ? "none" : "";
+    if (caps.attention) renderAttentionControls(data);
     renderTextStream();
     $("step-counter").textContent = data.tokens ? `${data.tokens.length} tokens · step ${data.step + 1}` : "";
     if (animate) return window.LLMViz.pipeline.animate(groups);

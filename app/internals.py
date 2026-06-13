@@ -162,6 +162,7 @@ def assemble_step(
         )
     return {
         "step": step,
+        "caps": {"attention": True, "embeddings": True, "layers_static": False},
         "tokens": tokens,
         "embeddings_2d": pca_2d(embeddings),
         "layers": layers,

@@ -34,6 +34,11 @@ MODELS = [
     {"id": "small", "label": "SMALL", "hf": "gpt2-medium", "params": "355M",
      "layers": 24, "heads": 16, "dim": 1024, "lazy": True,
      "blurb": "GPT-2 medium — 355M params, 24 layers. Loaded on demand."},
+    {"id": "gemma", "label": "GEMMA", "hf": None, "params": "9B",
+     "layers": 42, "heads": 16, "dim": 3584, "engine": "mlx",
+     "blurb": "Gemma 2 9B on Apple MLX (Mac mini, via tunnel) — a real, capable model. Shows "
+              "real tokens, probabilities & generated text; attention/layers are white-box only "
+              "(use NANO/MICRO for those)."},
 ]
 MODELS_BY_ID = {m["id"]: m for m in MODELS}
 # On the shared 4GB VPS, keep at most ONE live model resident at a time (~650MB each).
@@ -70,10 +75,17 @@ class ModelManager:
 
     def public_registry(self) -> list[dict]:
         """The /api/models payload: tiers + whether each is actually runnable here."""
+        from . import mlx_backend
         out = []
         for m in MODELS:
             entry = {k: m[k] for k in ("id", "label", "params", "layers", "heads", "dim", "blurb")}
-            entry["available"] = True if m["id"] == "demo" else tier_live(m["id"])
+            if m["id"] == "demo":
+                entry["available"] = True
+            elif m.get("engine") == "mlx":
+                entry["available"] = mlx_backend.configured()
+            else:
+                entry["available"] = tier_live(m["id"])
+            entry["engine"] = m.get("engine", "hf")
             entry["default"] = bool(m.get("default_demo"))   # DEMO is the landing default
             out.append(entry)
         return out

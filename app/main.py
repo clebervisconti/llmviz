@@ -61,13 +61,23 @@ class GenerateReq(BaseModel):
     temperature: float = Field(default=0.8, ge=0.05, le=2.0)
     top_k: int = Field(default=10, ge=1, le=50)
     generated: List[int] = Field(default_factory=list)
+    generated_text: str = Field(default="", max_length=4000)   # used by the MLX/GEMMA tier
     head: Optional[int] = None
     focus_layer: Optional[int] = None
 
 
+def _engine_of(tier: str) -> str:
+    spec = MODELS_BY_ID.get(tier) or {}
+    return spec.get("engine", "demo" if spec.get("hf") is None else "hf")
+
+
+def _is_mlx(tier: str) -> bool:
+    return MODELS_BY_ID.get(tier, {}).get("engine") == "mlx"
+
+
 def _is_demo(tier: str) -> bool:
     spec = MODELS_BY_ID.get(tier)
-    return spec is None or spec.get("hf") is None
+    return spec is None or (spec.get("hf") is None and spec.get("engine") != "mlx")
 
 
 @app.get("/api/health")
@@ -101,6 +111,14 @@ def _use_scripted(tier: str) -> bool:
 
 @app.post("/api/tokenize")
 def tokenize(req: TokenizeReq):
+    if _is_mlx(req.model):
+        from . import mlx_backend
+        if mlx_backend.configured():
+            try:
+                t = mlx_backend.tokenize(req.prompt or " ")
+                return {"tokens": t, "count": len(t), "engine": "mlx"}
+            except Exception as e:  # noqa: BLE001
+                raise HTTPException(502, f"MLX tokenize failed: {e}")
     if _use_scripted(req.model):
         t = demo_script.tokenize(req.prompt)
         return {"tokens": t, "count": len(t), "engine": "scripted"}
@@ -115,6 +133,20 @@ def tokenize(req: TokenizeReq):
 @app.post("/api/generate_step")
 async def generate_step(req: GenerateReq):
     prompt = req.prompt.strip() or demo_script.DEFAULT_PROMPT
+
+    # GEMMA tier → MLX server on the Mac (via tunnel). Remote call; no local memory lock.
+    if _is_mlx(req.model):
+        from . import mlx_backend
+        if not mlx_backend.configured():
+            raise HTTPException(503, "GEMMA backend not configured")
+        try:
+            return await asyncio.to_thread(
+                mlx_backend.generate_step,
+                prompt, req.model, req.temperature, req.top_k, req.generated_text,
+            )
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(502, f"MLX generation failed: {e}")
+
     if _use_scripted(req.model):
         # pure-python and fast; uses the selected tier's geometry (layers/heads)
         out = demo_script.generate_step(
