@@ -134,11 +134,16 @@ def tokenize(req: TokenizeReq):
 async def generate_step(req: GenerateReq):
     prompt = req.prompt.strip() or demo_script.DEFAULT_PROMPT
 
-    # GEMMA tier → MLX server on the Mac (via tunnel). Remote call; no local memory lock.
+    # GEMMA tier → MLX server on the Mac (via tunnel). Serialize: the single MLX server
+    # handles one generation at a time, so queue here rather than firing concurrent requests.
     if _is_mlx(req.model):
         from . import mlx_backend
         if not mlx_backend.configured():
             raise HTTPException(503, "GEMMA backend not configured")
+        try:
+            await asyncio.wait_for(_infer_lock.acquire(), timeout=45)
+        except asyncio.TimeoutError:
+            raise HTTPException(503, "model busy — try again in a moment")
         try:
             return await asyncio.to_thread(
                 mlx_backend.generate_step,
@@ -146,6 +151,8 @@ async def generate_step(req: GenerateReq):
             )
         except Exception as e:  # noqa: BLE001
             raise HTTPException(502, f"MLX generation failed: {e}")
+        finally:
+            _infer_lock.release()
 
     if _use_scripted(req.model):
         # pure-python and fast; uses the selected tier's geometry (layers/heads)

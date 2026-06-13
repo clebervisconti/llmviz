@@ -10,6 +10,7 @@ stdlib only (no deps). Streams responses so SSE (stream=true) chat completions w
 Env: LLMVIZ_MLX_URL, LLMVIZ_MLX_CF_ID, LLMVIZ_MLX_CF_SECRET, MLX_PROXY_PORT (default 8083).
 """
 import http.client
+import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
@@ -29,6 +30,7 @@ class Handler(BaseHTTPRequestHandler):
     def _relay(self, method: str):
         length = int(self.headers.get("Content-Length", 0) or 0)
         body = self.rfile.read(length) if length else None
+        body = self._gemma_fix(body)
         conn_cls = http.client.HTTPSConnection if _U.scheme == "https" else http.client.HTTPConnection
         up = conn_cls(_U.netloc, timeout=600)
         try:
@@ -72,6 +74,34 @@ class Handler(BaseHTTPRequestHandler):
                 pass
         finally:
             up.close()
+
+    def _gemma_fix(self, body):
+        """Gemma 2's chat template rejects the 'system' role. Merge any system messages
+        into the first user turn so clients that send a system prompt (e.g. Hermes) work."""
+        if not body or "chat/completions" not in self.path:
+            return body
+        try:
+            obj = json.loads(body)
+            msgs = obj.get("messages")
+            if not isinstance(msgs, list):
+                return body
+            sys_txt = "\n\n".join(
+                m["content"] for m in msgs
+                if m.get("role") == "system" and isinstance(m.get("content"), str)
+            )
+            if not sys_txt:
+                return body
+            rest = [m for m in msgs if m.get("role") != "system"]
+            for m in rest:
+                if m.get("role") == "user":
+                    m["content"] = sys_txt + "\n\n" + (m.get("content") or "")
+                    break
+            else:
+                rest.insert(0, {"role": "user", "content": sys_txt})
+            obj["messages"] = rest
+            return json.dumps(obj).encode()
+        except Exception:
+            return body
 
     def do_GET(self):
         self._relay("GET")
