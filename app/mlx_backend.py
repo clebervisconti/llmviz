@@ -118,11 +118,15 @@ def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
     # model keeps emitting past its real answer and drifts into markdown/filler.
     STOP_MARKERS = ("<end_of_turn>", "<eos>", "<start_of_turn>")
     gen_piece = choice.get("text", "")
-    done = choice.get("finish_reason") in ("stop", "length")
+    # NOTE: with max_tokens=1, finish_reason is "length" EVERY step — that is NOT a real stop.
+    # Only "stop" (model emitted EOS/end-of-turn) or a stop marker in the text ends generation.
+    done = choice.get("finish_reason") == "stop"
     for mk in STOP_MARKERS:
         if mk in gen_piece:
             gen_piece = gen_piece.split(mk)[0]
             done = True
+    if gen_piece == "":
+        done = True   # nothing generated → natural end
     sampled = {"id": (dist[0]["id"] if dist else 0), "text": gen_piece}
 
     # token chips: the user's prompt tokens + the generated text so far
@@ -135,8 +139,6 @@ def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
     # architecture-only layer blocks (real depth, but no activation data from a server)
     layers = [{"index": i, "hidden_norm": None} for i in range(MLX_LAYERS)]
 
-    if not gen_piece.strip() and gen_piece == "":
-        done = True   # empty piece → nothing more to generate
     done = done or len(tok.encode((generated_text or "") + gen_piece)) >= internals.MAX_SEQ
 
     return {
