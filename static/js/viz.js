@@ -95,17 +95,38 @@
       svg.appendChild(more);
     }
 
-    // ---- embeddings scatter ----
-    const bx = COL.embed - 95, by = 250, bs = 190;
+    // ---- embeddings scatter: each token becomes a vector, shown as a point in 2D ----
+    const bs = 200, bx = COL.embed - bs / 2, by = (TOP + BOT) / 2 - bs / 2;  // vertically centered
     const embBox = el("g", { class: "emb-box" });
     embBox.appendChild(el("rect", { x: bx, y: by, width: bs, height: bs, rx: 10,
       fill: "rgba(40,214,0,0.04)", stroke: "rgba(40,214,0,0.25)" }));
-    (data.embeddings_2d || []).forEach((p) => {
-      const cx = bx + bs / 2 + p[0] * (bs / 2 - 14);
-      const cy = by + bs / 2 + p[1] * (bs / 2 - 14);
-      embBox.appendChild(el("circle", { class: "emb-dot", cx, cy, r: 3.5, opacity: 0.85 }));
+    // faint cross-hair axes to signal "this is a 2D space"
+    embBox.appendChild(el("line", { x1: bx + 12, y1: by + bs / 2, x2: bx + bs - 12, y2: by + bs / 2, stroke: "rgba(255,255,255,0.07)" }));
+    embBox.appendChild(el("line", { x1: bx + bs / 2, y1: by + 12, x2: bx + bs / 2, y2: by + bs - 12, stroke: "rgba(255,255,255,0.07)" }));
+    const emb = data.embeddings_2d || [];
+    const labelAll = emb.length <= 12;       // avoid clutter on long prompts
+    emb.forEach((p, i) => {
+      const cx = bx + bs / 2 + p[0] * (bs / 2 - 26);
+      const cy = by + bs / 2 + p[1] * (bs / 2 - 26);
+      embBox.appendChild(el("circle", { class: "emb-dot", cx, cy, r: 4, opacity: 0.9 }));
+      const txt = ((tokens[i] && tokens[i].text) || "").trim();
+      if (labelAll && txt) {
+        const lab = el("text", { x: cx + 7, y: cy + 3, class: "emb-label" });
+        lab.textContent = txt.slice(0, 8);
+        embBox.appendChild(lab);
+      }
     });
-    hoverable(embBox, TIP.embed[0], TIP.embed[1]);
+    // honest caption: real "meaning space" only with a live model; illustrative in DEMO
+    const live = data.engine === "live";
+    const cap = el("text", { x: COL.embed, y: by + bs + 18, "text-anchor": "middle", class: "emb-caption" });
+    cap.textContent = live ? "the model's learned meaning space (2D)" : "positions are illustrative (DEMO)";
+    embBox.appendChild(cap);
+    const cap2 = el("text", { x: COL.embed, y: by - 10, "text-anchor": "middle", class: "emb-caption" });
+    cap2.textContent = "each token → a vector → a point";
+    embBox.appendChild(cap2);
+    hoverable(embBox, TIP.embed[0],
+      live ? "Each token is turned into a vector of " + (data.dim || "hundreds of") + " numbers the model learned during training. Similar words sit near each other. Shown here squeezed down to 2D."
+           : "Each token becomes a vector of numbers (its embedding). With a real model (NANO/MICRO) similar words cluster; in DEMO these positions are just illustrative.");
     svg.appendChild(embBox);
     groups.embedG = embBox;
 

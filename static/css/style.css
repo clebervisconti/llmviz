@@ -188,7 +188,9 @@ main { flex: 1; display: grid; grid-template-columns: 320px 1fr 360px; gap: 18px
 #pipeline .layer-block { cursor: pointer; transition: opacity .2s; }
 #pipeline .layer-block:hover rect { stroke: var(--cv-accent); }
 #pipeline .flow-edge { stroke-linecap: round; }
-#pipeline .emb-dot { fill: var(--cv-accent); }
+#pipeline .emb-dot { fill: var(--cv-accent); filter: drop-shadow(0 0 3px rgba(40,214,0,0.7)); }
+#pipeline .emb-label { font-family: var(--cv-font-mono); font-size: 9.5px; fill: var(--cv-text-muted); }
+#pipeline .emb-caption { font-family: var(--cv-font-heading); font-size: 9px; letter-spacing: 0.08em; fill: var(--cv-text-faint); text-transform: uppercase; }
 #pipeline .out-chip rect { fill: var(--cv-accent-muted); stroke: var(--cv-accent); }
 #pipeline .out-chip text { font-family: var(--cv-font-mono); font-size: 13px; fill: var(--cv-accent); font-weight: 600; }
 #pipeline .pulse { animation: blockpulse .5s ease-out; }

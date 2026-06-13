@@ -123,6 +123,8 @@
 
   function renderAll(data, animate) {
     const svg = $("pipeline");
+    const m = state.models.find((x) => x.id === state.model);
+    if (m) data.dim = m.dim;   // let the embeddings tooltip name the real vector size
     const groups = window.LLMViz.pipeline.render(svg, data);
     renderPredictions(data);
     renderAttentionControls(data);
