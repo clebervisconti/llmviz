@@ -15,9 +15,10 @@ Config (env): LLMVIZ_MLX_URL, LLMVIZ_MLX_MODEL, LLMVIZ_MLX_LAYERS,
 """
 from __future__ import annotations
 
+import http.client
 import json
 import os
-import urllib.request
+from urllib.parse import urlparse
 
 import numpy as np
 
@@ -45,13 +46,29 @@ def _tokenizer():
 
 
 def _post(path: str, payload: dict, timeout: int = 120) -> dict:
-    headers = {"Content-Type": "application/json"}
-    if CF_ID and CF_SECRET:
-        headers["CF-Access-Client-Id"] = CF_ID
-        headers["CF-Access-Client-Secret"] = CF_SECRET
-    req = urllib.request.Request(MLX_URL + path, data=json.dumps(payload).encode(), headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read())
+    # http.client (not urllib): avoids urllib's default "Python-urllib" User-Agent,
+    # which Cloudflare's bot protection blocks in front of the Access-gated endpoint.
+    u = urlparse(MLX_URL)
+    Conn = http.client.HTTPSConnection if u.scheme == "https" else http.client.HTTPConnection
+    conn = Conn(u.netloc, timeout=timeout)
+    body = json.dumps(payload).encode()
+    try:
+        conn.putrequest("POST", path, skip_host=False, skip_accept_encoding=True)
+        conn.putheader("Content-Type", "application/json")
+        conn.putheader("Content-Length", str(len(body)))
+        conn.putheader("User-Agent", "LLMViz/1.0")
+        if CF_ID and CF_SECRET:
+            conn.putheader("CF-Access-Client-Id", CF_ID)
+            conn.putheader("CF-Access-Client-Secret", CF_SECRET)
+        conn.endheaders()
+        conn.send(body)
+        resp = conn.getresponse()
+        data = resp.read()
+        if resp.status != 200:
+            raise RuntimeError(f"HTTP {resp.status}: {data[:200].decode(errors='replace')}")
+        return json.loads(data)
+    finally:
+        conn.close()
 
 
 def tokenize(prompt: str):
