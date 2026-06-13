@@ -1,0 +1,12 @@
+# LLMViz backend
+# DEMO mode needs only the first three. The live GPT-2 tiers additionally need
+# torch + transformers (install the CPU torch wheel on the VPS — see DEPLOYMENT.md):
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install transformers
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+numpy==1.26.4
+
+# --- live models (optional; app runs DEMO-only without these) ---
+# torch>=2.2          # install the CPU wheel, see comment above
+# transformers>=4.40

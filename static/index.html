@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LLMViz · Watch a Language Model Think · Cleber Visconti</title>
+  <link rel="icon" type="image/png" href="/static/img/cv-monogram.png">
+  <link rel="stylesheet" href="/static/css/style.css?v=2">
+</head>
+<body class="cv-theme">
+  <canvas id="bgfx"></canvas>
+
+  <header class="topbar">
+    <div class="brand">
+      <a href="https://clebervisconti.com" target="_blank" rel="noopener">
+        <img src="/static/img/cv-wordmark.png" alt="cleber visconti" class="logo">
+      </a>
+      <span class="divider"></span>
+      <span class="product">LLM<span class="accent">VIZ</span></span>
+    </div>
+    <nav>
+      <span class="model-badge" id="model-badge" title="The active model.">loading…</span>
+      <a class="nav-link" href="https://github.com/clebervisconti/llmviz" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- LEFT: prompt + controls -->
+    <section class="panel left">
+      <h2 class="panel-title">// PROMPT</h2>
+      <textarea class="prompt-box" id="prompt" rows="3" spellcheck="false">The cat sat on the</textarea>
+
+      <div class="samples">
+        <p class="muted small">or try a sample:</p>
+        <div class="sample-row" id="samples"></div>
+      </div>
+
+      <h3 class="sub-title">// MODEL SIZE <span class="hint">— more parameters = more layers &amp; heads</span></h3>
+      <div class="segmented" id="model-seg"></div>
+      <div class="model-meta" id="model-meta">—</div>
+
+      <h3 class="sub-title">// SAMPLING</h3>
+      <div class="ctrl-row">
+        <span class="lbl">temperature</span>
+        <input type="range" id="temp" min="0.1" max="2.0" step="0.05" value="0.8">
+        <output id="temp-out">0.80</output>
+      </div>
+      <div class="ctrl-row">
+        <span class="lbl">top-k</span>
+        <input type="range" id="topk" min="1" max="50" step="1" value="10">
+        <output id="topk-out">10</output>
+      </div>
+
+      <div class="run-row">
+        <button class="btn btn-primary" id="run">▶ Generate</button>
+        <button class="btn btn-ghost" id="step">Step</button>
+      </div>
+      <div class="status" id="status">ready — press Generate</div>
+    </section>
+
+    <!-- CENTER: pipeline -->
+    <section class="panel center">
+      <div class="net-header">
+        <h2 class="panel-title">// PIPELINE</h2>
+        <span class="muted small" id="step-counter"></span>
+      </div>
+      <div class="net-stage">
+        <svg id="pipeline" viewBox="0 0 960 600" preserveAspectRatio="xMidYMid meet"></svg>
+        <div id="viz-tooltip" class="viz-tooltip" role="tooltip" aria-hidden="true"></div>
+      </div>
+      <div class="legend">
+        <span><i class="dot c-token"></i>tokens</span>
+        <span><i class="dot c-embed"></i>embeddings</span>
+        <span><i class="dot c-layer"></i>transformer layers</span>
+        <span><i class="dot c-out"></i>next token</span>
+      </div>
+    </section>
+
+    <!-- RIGHT: outputs -->
+    <section class="panel right">
+      <h2 class="panel-title">// NEXT TOKEN</h2>
+      <div class="bars-legend">
+        <span><i class="raw"></i>raw probabilities</span>
+        <span><i class="samp"></i>after temp + top-k</span>
+      </div>
+      <ul class="predictions" id="predictions"><li class="empty">run to see the next-token distribution</li></ul>
+
+      <h3 class="sub-title">// ATTENTION <span class="hint">— who looks at whom</span></h3>
+      <div class="attn-controls">
+        <span>layer</span>
+        <input type="range" id="attn-layer" min="0" max="0" step="1" value="0">
+        <output id="attn-layer-out">0</output>
+        <button class="toggle active" id="attn-mode" data-mode="mean">mean heads</button>
+      </div>
+      <div class="attn-wrap">
+        <canvas id="attn-heatmap" width="64" height="64"></canvas>
+        <div class="attn-axis">key tokens (columns) ← each row is a query token</div>
+      </div>
+
+      <h3 class="sub-title">// OUTPUT TEXT</h3>
+      <div class="text-stream" id="text-stream"><span class="prompt-part">The cat sat on the</span><span class="cursor">▌</span></div>
+    </section>
+  </main>
+
+  <footer>
+    <span>cleber visconti · ai/ml classroom demo · <a href="https://clebervisconti.com">clebervisconti.com</a> · sibling of <a href="https://neuralnetviz.clebervisconti.com">NeuraNetViz</a></span>
+  </footer>
+
+  <script src="/static/js/bgfx.js?v=2"></script>
+  <script src="/static/js/viz.js?v=2"></script>
+  <script src="/static/js/attention.js?v=2"></script>
+  <script src="/static/js/controls.js?v=2"></script>
+</body>
+</html>

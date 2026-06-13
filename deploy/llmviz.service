@@ -1,0 +1,25 @@
+# Installed at /etc/systemd/system/llmviz.service on the HostGator VPS.
+# OpenLiteSpeed reverse-proxies llmviz.cybersphere.com.br to 127.0.0.1:8802.
+# NeuraNetViz owns 8801; LLMViz uses 8802.
+[Unit]
+Description=LLMViz FastAPI app
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/lib/llmviz/repo
+Environment=PATH=/var/lib/llmviz/venv/bin:/usr/bin
+# HF model cache lives off the repo so git pulls don't wipe it
+Environment=HF_HOME=/var/lib/llmviz/hf-cache
+ExecStart=/var/lib/llmviz/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8802 --workers 1
+Restart=on-failure
+RestartSec=5
+# Memory guard: 4GB box shared with WordPress + NeuraNetViz. A runaway inference
+# is killed rather than OOMing the whole server.
+MemoryMax=2G
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
