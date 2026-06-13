@@ -35,6 +35,21 @@ app = FastAPI(title="LLMViz", docs_url=None, redoc_url=None)
 _infer_lock = asyncio.Lock()
 
 
+@app.middleware("http")
+async def cache_headers(request, call_next):
+    """index.html must never be cached (so asset-version bumps take effect immediately);
+    versioned /static/* assets and /api responses get sensible caching."""
+    resp = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith(".html"):
+        resp.headers["Cache-Control"] = "no-store, must-revalidate"
+    elif path.startswith("/static/"):
+        resp.headers["Cache-Control"] = "public, max-age=3600"
+    elif path.startswith("/api/"):
+        resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 class TokenizeReq(BaseModel):
     prompt: str = Field(default="", max_length=2000)
     model: str = "demo"
