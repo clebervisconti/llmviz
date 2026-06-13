@@ -81,7 +81,7 @@
       const w = 120, x = COL.tokens - w / 2;
       const g = el("g", { class: "tok-chip" });
       g.appendChild(el("rect", { x, y: y - th / 2 + 2, width: w, height: th - 4, rx: 7,
-        fill: "rgba(255,255,255,0.06)", stroke: "rgba(255,255,255,0.25)" }));
+        fill: "rgba(255,255,255,0.11)", stroke: "rgba(255,255,255,0.32)" }));
       const t = el("text", { x: COL.tokens, y: y + 4, class: "tok-text", "text-anchor": "middle" });
       t.textContent = (tok.text || "").replace(/\n/g, "⏎").slice(0, 14) || "·";
       g.appendChild(t);

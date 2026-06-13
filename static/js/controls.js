@@ -120,9 +120,17 @@
   function renderTextStream() {
     const el = $("text-stream");
     const gen = state.lastStep ? collectGenText() : "";
-    el.innerHTML = `<span class="prompt-part">${escapeHtml(state.prompt)}</span>` +
-      `<span class="gen-part">${escapeHtml(gen)}</span>` +
-      (state.running ? '<span class="cursor">▌</span>' : "");
+    const cursor = state.running ? '<span class="cursor">▌</span>' : "";
+    // chat models (GEMMA/MLX) RESPOND to the prompt — show the reply on its own line,
+    // not concatenated (the model doesn't continue the text, it answers it).
+    if (state.lastStep && state.lastStep.engine === "mlx") {
+      el.innerHTML =
+        `<div class="chat-prompt"><span class="muted">prompt:</span> ${escapeHtml(state.prompt)}</div>` +
+        `<div class="chat-reply"><span class="muted">reply:</span> <span class="gen-part">${escapeHtml(gen)}</span>${cursor}</div>`;
+    } else {
+      el.innerHTML = `<span class="prompt-part">${escapeHtml(state.prompt)}</span>` +
+        `<span class="gen-part">${escapeHtml(gen)}</span>` + cursor;
+    }
   }
 
   // accumulate generated token texts (we stored them during the run)
@@ -194,6 +202,7 @@
     state.generated = []; state.lastStep = null; genText.length = 0; state.running = false;
     $("predictions").innerHTML = '<li class="empty">run to see the next-token distribution</li>';
     $("step-counter").textContent = "";
+    status("ready — press Generate", "");   // clear any stale status from a previous tier/run
     renderTextStream();
     // draw an initial (step-0) frame so the pipeline isn't empty
     doStep(false, true).catch(() => {});

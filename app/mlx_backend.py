@@ -114,8 +114,16 @@ def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
     for d in dist:
         d["p"] = round(d["p"] / s, 4)    # renormalize the visible top-k
 
+    # Stop cleanly at Gemma's end-of-turn / eos markers (instruct model). Without this the
+    # model keeps emitting past its real answer and drifts into markdown/filler.
+    STOP_MARKERS = ("<end_of_turn>", "<eos>", "<start_of_turn>")
     gen_piece = choice.get("text", "")
-    sampled = {"id": (dist[0]["id"] if dist else 0), "text": gen_piece or (dist[0]["text"] if dist else "")}
+    done = choice.get("finish_reason") in ("stop", "length")
+    for mk in STOP_MARKERS:
+        if mk in gen_piece:
+            gen_piece = gen_piece.split(mk)[0]
+            done = True
+    sampled = {"id": (dist[0]["id"] if dist else 0), "text": gen_piece}
 
     # token chips: the user's prompt tokens + the generated text so far
     tokens = tokenize(prompt)
@@ -127,8 +135,9 @@ def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
     # architecture-only layer blocks (real depth, but no activation data from a server)
     layers = [{"index": i, "hidden_norm": None} for i in range(MLX_LAYERS)]
 
-    finished = choice.get("finish_reason") in ("stop", "length") and not gen_piece.strip()
-    done = finished or len(tok.encode((generated_text or "") + gen_piece)) >= internals.MAX_SEQ
+    if not gen_piece.strip() and gen_piece == "":
+        done = True   # empty piece → nothing more to generate
+    done = done or len(tok.encode((generated_text or "") + gen_piece)) >= internals.MAX_SEQ
 
     return {
         "step": len(tok.encode(generated_text)) if generated_text else 0,

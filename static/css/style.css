@@ -288,6 +288,9 @@ main { flex: 1; display: grid; grid-template-columns: 320px 1fr 360px; gap: 18px
 }
 .text-stream .prompt-part { color: var(--cv-text-muted); }
 .text-stream .gen-part { color: var(--cv-accent); }
+.text-stream .chat-prompt { color: var(--cv-text-muted); }
+.text-stream .chat-reply { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--cv-border); }
+.text-stream .chat-prompt .muted, .text-stream .chat-reply .muted { font-family: var(--cv-font-heading); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; margin-right: 6px; }
 .text-stream .cursor { color: var(--cv-accent); animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
