@@ -32,6 +32,12 @@
         const m = await import(CDN);
         m.env.allowLocalModels = false;          // always fetch from HF CDN
         m.env.useBrowserCache = true;            // cache the model in the browser after first load
+        // Single-threaded WASM: threaded ORT needs cross-origin isolation (COOP/COEP) which
+        // this page doesn't set; the worker's wasm fetch otherwise fails with "Failed to fetch".
+        try {
+          m.env.backends.onnx.wasm.numThreads = 1;
+          m.env.backends.onnx.wasm.proxy = false;
+        } catch (_) {}
         tok = await m.AutoTokenizer.from_pretrained(MODEL, { progress_callback: onProgress });
         model = await m.AutoModelForCausalLM.from_pretrained(MODEL, { dtype: "q8", progress_callback: onProgress });
         tjs = m;
