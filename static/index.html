@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LLMViz · Watch a Language Model Think · Cleber Visconti</title>
-  <link rel="icon" type="image/png" href="/static/img/cs-icon.png?v=9">
-  <link rel="stylesheet" href="/static/css/style.css?v=9">
+  <link rel="icon" type="image/png" href="/static/img/cs-icon.png?v=10">
+  <link rel="stylesheet" href="/static/css/style.css?v=10">
 </head>
 <body class="cv-theme">
   <canvas id="bgfx"></canvas>
@@ -13,7 +13,7 @@
   <header class="topbar">
     <div class="brand">
       <a href="https://clebervisconti.com" target="_blank" rel="noopener">
-        <img src="/static/img/cs-icon.png?v=9" alt="CYBERSPHERE" class="logo logo-icon">
+        <img src="/static/img/cs-icon.png?v=10" alt="CYBERSPHERE" class="logo logo-icon">
       </a>
       <span class="divider"></span>
       <span class="product">LLM<span class="accent">VIZ</span></span>
@@ -63,6 +63,7 @@
         <button class="btn btn-primary" id="run">▶ Generate</button>
         <button class="btn btn-ghost" id="step">Step</button>
       </div>
+      <button class="btn btn-ghost compare-btn" id="compare-btn">⊞ Compare all models</button>
       <div class="status" id="status">ready — press Generate</div>
     </section>
 
@@ -121,9 +122,22 @@
     <span>cleber visconti · ai/ml classroom demo · <a href="https://clebervisconti.com">clebervisconti.com</a> · sibling of <a href="https://neuralnetviz.clebervisconti.com">NeuraNetViz</a></span>
   </footer>
 
-  <script src="/static/js/bgfx.js?v=9"></script>
-  <script src="/static/js/viz.js?v=9"></script>
-  <script src="/static/js/attention.js?v=9"></script>
-  <script src="/static/js/controls.js?v=9"></script>
+  <div id="compare-modal" class="modal" style="display:none">
+    <div class="modal-card">
+      <div class="modal-head">
+        <span>NEXT-TOKEN PREDICTION — same prompt, every model</span>
+        <button class="modal-close" id="compare-close">✕</button>
+      </div>
+      <div class="modal-prompt"><span class="muted small">prompt:</span> <span id="compare-prompt"></span></div>
+      <div class="compare-grid" id="compare-grid"></div>
+      <div class="modal-foot muted">Each column is one model's top next-token guesses for the same prompt — watch how bigger / instruct models shift the distribution.</div>
+    </div>
+  </div>
+
+  <script src="/static/js/bgfx.js?v=10"></script>
+  <script src="/static/js/viz.js?v=10"></script>
+  <script src="/static/js/attention.js?v=10"></script>
+  <script src="/static/js/browser_infer.js?v=10"></script>
+  <script src="/static/js/controls.js?v=10"></script>
 </body>
 </html>

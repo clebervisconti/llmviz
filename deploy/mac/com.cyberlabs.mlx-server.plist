@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Installed at ~/Library/LaunchAgents/com.cyberlabs.mlx-server.plist on the Mac mini.
+     Runs the watchdog (which manages + health-checks the MLX server). Auto-loads at login;
+     to activate now without relogin:
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.cyberlabs.mlx-server.plist
+     (kill any nohup watchdog first so they don't both bind :8081). -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.cyberlabs.mlx-server</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Volumes/STORAGE/Cyberlabs/mlx-watchdog.py</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HF_HUB_CACHE</key><string>/Volumes/STORAGE/Cyberlabs/models</string>
+    <key>HF_HOME</key><string>/Volumes/STORAGE/Cyberlabs/models</string>
+    <key>MLX_MODEL</key><string>mlx-community/gemma-2-9b-it-4bit</string>
+    <key>MLX_PORT</key><string>8081</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Volumes/STORAGE/Cyberlabs/models/mlx-watchdog.log</string>
+  <key>StandardErrorPath</key><string>/Volumes/STORAGE/Cyberlabs/models/mlx-watchdog.log</string>
+</dict>
+</plist>

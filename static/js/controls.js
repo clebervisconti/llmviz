@@ -5,12 +5,21 @@
   const $ = (id) => document.getElementById(id);
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  // completion-style prompts for base/white-box tiers (they continue the text)
   const SAMPLES = [
     "The cat sat on the",
     "Once upon a time, in a land",
     "The capital of France is",
     "To make a good cup of coffee, you",
     "In the year 2050, computers will",
+  ];
+  // chat-style prompts for instruct tiers like GEMMA (they answer the prompt)
+  const CHAT_SAMPLES = [
+    "What is the capital of France?",
+    "Explain photosynthesis in one sentence.",
+    "Write a haiku about the ocean.",
+    "Why is the sky blue?",
+    "Give me 3 tips for better sleep.",
   ];
 
   const state = {
@@ -82,9 +91,21 @@
       badge.title = m.blurb;
       badge.classList.toggle("scripted", m.id === "demo" || !m.available);
     }
-    // reset run for the new geometry; re-tokenize (tokenizers differ per model)
+    // reset run for the new geometry; re-tokenize (tokenizers differ per model); swap samples
     resetRun();
     refreshTokens();
+    renderSamples();
+
+    // in-browser tier: download the model on first selection, with progress
+    if (id === "browser" && window.LLMViz.browser) {
+      status("loading in-browser model…", "busy");
+      window.LLMViz.browser.ensureLoaded((p) => {
+        if (p && p.status === "progress" && p.total) {
+          status(`downloading model… ${Math.round((p.loaded / p.total) * 100)}%`, "busy");
+        }
+      }).then(() => { status("in-browser model ready — press Generate", "ok"); refreshTokens(); })
+        .catch((e) => status("browser model failed to load: " + (e.message || e), "err"));
+    }
   }
 
   // ---------- rendering ----------
@@ -156,9 +177,13 @@
     }
     const myReq = ++tokReq;
     try {
-      const data = await api("/api/tokenize", { prompt, model: state.model });
+      let toks;
+      if (state.model === "browser") {
+        toks = await window.LLMViz.browser.tokenize(prompt);
+      } else {
+        toks = (await api("/api/tokenize", { prompt, model: state.model })).tokens || [];
+      }
       if (myReq !== tokReq) return;                 // a newer request superseded this one
-      const toks = data.tokens || [];
       view.innerHTML = "";
       toks.forEach((t, i) => {
         const span = document.createElement("span");
@@ -213,8 +238,13 @@
     const myEpoch = state.epoch;   // if the model/prompt changes mid-flight, drop this result
     try {
       if (!silent) status("running forward pass…", "busy");
-      const data = await api("/api/generate_step", stepBody(
-        state.attnMode === "single" ? { head: 0, focus_layer: state.attnLayer } : {}));
+      let data;
+      if (state.model === "browser") {
+        data = await window.LLMViz.browser.generateStep(state.prompt, genText.join(""), state.temp, state.topk);
+      } else {
+        data = await api("/api/generate_step", stepBody(
+          state.attnMode === "single" ? { head: 0, focus_layer: state.attnLayer } : {}));
+      }
       if (myEpoch !== state.epoch) return null;   // superseded — ignore stale render
       state.lastStep = data;
       // record generated token text (only when actually advancing, not the silent preview)
@@ -252,17 +282,51 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   function escapeHtml(s) { return (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
-  // ---------- wire up ----------
-  function init() {
-    // sample prompts
-    const sr = $("samples");
-    SAMPLES.forEach((p) => {
+  // ---------- compare models ----------
+  function openCompare() {
+    const prompt = state.prompt.trim();
+    if (!prompt) return;
+    $("compare-prompt").textContent = prompt;
+    const grid = $("compare-grid");
+    grid.innerHTML = "";
+    $("compare-modal").style.display = "flex";
+    // one column per model (skip the browser tier — it runs client-side, handled separately)
+    const models = state.models.filter((m) => m.engine !== "browser");
+    models.forEach((m) => {
+      const col = document.createElement("div");
+      col.className = "compare-col";
+      col.innerHTML = `<h4>${escapeHtml(m.label)}</h4><div class="col-sub">${escapeHtml(m.params)} · <span class="eng">${escapeHtml(m.engine)}</span></div><div class="loading">predicting…</div>`;
+      grid.appendChild(col);
+      api("/api/generate_step", { prompt, model: m.id, temperature: state.temp, top_k: state.topk, generated: [], generated_text: "" })
+        .then((d) => {
+          const top = (d.logits_sampled || []).slice(0, 5);
+          if (m === models[0]) col.classList.add("top1");
+          col.innerHTML = `<h4>${escapeHtml(m.label)}</h4><div class="col-sub">${escapeHtml(m.params)} · <span class="eng">${escapeHtml(d.engine || m.engine)}</span></div>` +
+            top.map((t) => `<div class="cmp-row"><span class="lbl">${escapeHtml(t.text)}</span><span class="pct">${(t.p * 100).toFixed(0)}%</span><span class="cmp-bar"><span style="width:${(t.p * 100).toFixed(1)}%"></span></span></div>`).join("");
+        })
+        .catch((e) => { col.innerHTML = `<h4>${escapeHtml(m.label)}</h4><div class="err">unavailable<br><span class="muted">${escapeHtml((e.message || "").slice(0, 40))}</span></div>`; });
+    });
+  }
+  function closeCompare() { $("compare-modal").style.display = "none"; }
+
+  // sample prompts adapt to the tier: chat/questions for instruct models (GEMMA),
+  // completion-style for base/white-box tiers
+  function renderSamples() {
+    const m = state.models.find((x) => x.id === state.model);
+    const list = (m && m.engine === "mlx") ? CHAT_SAMPLES : SAMPLES;
+    const sr = $("samples"); sr.innerHTML = "";
+    list.forEach((p) => {
       const b = document.createElement("button");
-      b.textContent = p.length > 22 ? p.slice(0, 22) + "…" : p;
+      b.textContent = p.length > 24 ? p.slice(0, 24) + "…" : p;
       b.title = p;
       b.addEventListener("click", () => { $("prompt").value = p; state.prompt = p; resetRun(); refreshTokens(); });
       sr.appendChild(b);
     });
+  }
+
+  // ---------- wire up ----------
+  function init() {
+    renderSamples();
 
     $("prompt").addEventListener("input", (e) => { state.prompt = e.target.value; debouncedTokens(); });
     $("prompt").addEventListener("change", () => { resetRun(); refreshTokens(); });
@@ -292,6 +356,11 @@
     $("run").addEventListener("click", runAll);
     $("step").addEventListener("click", () => { state.running = false; doStep(true, false); });
 
+    $("compare-btn").addEventListener("click", openCompare);
+    $("compare-close").addEventListener("click", closeCompare);
+    $("compare-modal").addEventListener("click", (e) => { if (e.target.id === "compare-modal") closeCompare(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeCompare(); });
+
     // clicking a layer block in the pipeline focuses the attention view on it
     window.LLMViz.onLayerClick = (i) => {
       state.attnLayer = i; $("attn-layer").value = i; $("attn-layer-out").textContent = i;
@@ -304,8 +373,15 @@
 
     // boot: load models, then auto-play the DEMO landing experience
     api("/api/models").then((r) => {
-      buildModels(r.models);
-      const def = r.models.find((m) => m.default) || r.models[0];
+      const models = r.models.slice();
+      // client-side tier: runs entirely in the browser via transformers.js (no server)
+      if (window.LLMViz && window.LLMViz.browser) {
+        models.push({ id: "browser", label: "BROWSER", params: "82M", layers: 6, heads: 12, dim: 768,
+          engine: "browser", available: true, default: false,
+          blurb: "DistilGPT-2 running ENTIRELY in your browser (transformers.js, no server). Real tokens, probabilities & text; attention is white-box-only. First use downloads the model (~30MB)." });
+      }
+      buildModels(models);
+      const def = models.find((m) => m.default) || models[0];
       if (def) selectModel(def.id);
       status("ready — press Generate", "");
       if (!reduced) setTimeout(runAll, 600); // DEMO auto-plays on load
