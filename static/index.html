@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LLMViz · Watch a Language Model Think · Cleber Visconti</title>
-  <link rel="icon" type="image/png" href="/static/img/cs-icon.png?v=8">
-  <link rel="stylesheet" href="/static/css/style.css?v=8">
+  <link rel="icon" type="image/png" href="/static/img/cs-icon.png?v=9">
+  <link rel="stylesheet" href="/static/css/style.css?v=9">
 </head>
 <body class="cv-theme">
   <canvas id="bgfx"></canvas>
@@ -13,7 +13,7 @@
   <header class="topbar">
     <div class="brand">
       <a href="https://clebervisconti.com" target="_blank" rel="noopener">
-        <img src="/static/img/cs-icon.png?v=8" alt="CYBERSPHERE" class="logo logo-icon">
+        <img src="/static/img/cs-icon.png?v=9" alt="CYBERSPHERE" class="logo logo-icon">
       </a>
       <span class="divider"></span>
       <span class="product">LLM<span class="accent">VIZ</span></span>
@@ -93,6 +93,9 @@
       </div>
       <ul class="predictions" id="predictions"><li class="empty">run to see the next-token distribution</li></ul>
 
+      <h3 class="sub-title">// OUTPUT TEXT</h3>
+      <div class="text-stream" id="text-stream"><span class="prompt-part">The cat sat on the</span><span class="cursor">▌</span></div>
+
       <div id="attn-section">
         <h3 class="sub-title">// ATTENTION <span class="hint">— who looks at whom</span></h3>
         <div class="attn-controls">
@@ -111,9 +114,6 @@
         <b>NANO</b> or <b>MICRO</b> to see them. A hosted model like Gemma only exposes its
         outputs (tokens, probabilities, text), not its internals.
       </div>
-
-      <h3 class="sub-title">// OUTPUT TEXT</h3>
-      <div class="text-stream" id="text-stream"><span class="prompt-part">The cat sat on the</span><span class="cursor">▌</span></div>
     </section>
   </main>
 
@@ -121,9 +121,9 @@
     <span>cleber visconti · ai/ml classroom demo · <a href="https://clebervisconti.com">clebervisconti.com</a> · sibling of <a href="https://neuralnetviz.clebervisconti.com">NeuraNetViz</a></span>
   </footer>
 
-  <script src="/static/js/bgfx.js?v=8"></script>
-  <script src="/static/js/viz.js?v=8"></script>
-  <script src="/static/js/attention.js?v=8"></script>
-  <script src="/static/js/controls.js?v=8"></script>
+  <script src="/static/js/bgfx.js?v=9"></script>
+  <script src="/static/js/viz.js?v=9"></script>
+  <script src="/static/js/attention.js?v=9"></script>
+  <script src="/static/js/controls.js?v=9"></script>
 </body>
 </html>
