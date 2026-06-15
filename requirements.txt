@@ -10,3 +10,10 @@ numpy==1.26.4
 # --- live models (optional; app runs DEMO-only without these) ---
 # torch>=2.2          # install the CPU wheel, see comment above
 # transformers>=4.40
+
+# --- Splunk Observability APM (OpenTelemetry) ---
+# After installing this, run `opentelemetry-bootstrap -a install` once in the venv to
+# pull the instrumentation libs for the installed frameworks (FastAPI/ASGI/urllib3).
+# The app launches under `opentelemetry-instrument` (see deploy/llmviz.service) and
+# exports OTLP to the local Splunk OTel Collector on 127.0.0.1:4317.
+splunk-opentelemetry==2.10.1

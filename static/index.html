@@ -3,6 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Splunk Observability — Browser RUM (user-experience analytics).
+       Loaded first so it captures page-load timing, JS errors, and propagates
+       trace context to same-origin /api/* calls (RUM <-> APM correlation).
+       The RUM access token is public-by-design (browser-side) and RUM-scoped only. -->
+  <script src="https://cdn.signalfx.com/o11y-gdi-rum/latest/splunk-otel-web.js" crossorigin="anonymous"></script>
+  <script>
+    if (window.SplunkRum) {
+      SplunkRum.init({
+        realm: "us1",
+        rumAccessToken: "RjVIHorIfRepXrd-KsUegQ",
+        applicationName: "llmviz-browser",
+        deploymentEnvironment: "production",
+        version: "1.0.0"
+      });
+    }
+  </script>
+
   <title>LLMViz · Watch a Language Model Think · Cleber Visconti</title>
   <link rel="icon" type="image/png" href="/static/img/cs-icon.png?v=11">
   <link rel="stylesheet" href="/static/css/style.css?v=11">

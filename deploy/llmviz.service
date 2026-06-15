@@ -13,6 +13,16 @@ Environment=PATH=/var/lib/llmviz/venv/bin:/usr/bin
 # HF model cache lives off the repo so git pulls don't wipe it
 Environment=HF_HOME=/var/lib/llmviz/hf-cache
 Environment=OMP_NUM_THREADS=2
+# --- Splunk Observability APM (OpenTelemetry) ---
+# Traces + app metrics export via OTLP to the local Splunk OTel Collector (loopback,
+# no public ports). The collector holds the org access token; the app carries none.
+Environment=OTEL_SERVICE_NAME=llmviz
+Environment=OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production,service.namespace=cybersphere
+Environment=OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317
+Environment=OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+Environment=OTEL_TRACES_EXPORTER=otlp
+Environment=OTEL_METRICS_EXPORTER=otlp
+Environment=OTEL_LOGS_EXPORTER=none
 # Live tiers enabled after benchmarking (2026-06-13): NANO + MICRO fit (~650MB, <0.5s/fwd).
 # SMALL (gpt2-medium) left OFF — too tight on this shared 4GB box; it serves the scripted engine.
 Environment=LLMVIZ_LIVE=1
@@ -20,7 +30,7 @@ Environment=LLMVIZ_LIVE_TIERS=nano,micro
 # GEMMA tier (MLX server on the Mac mini via tunnel) — secrets live in this file (mode 600),
 # not in git: LLMVIZ_MLX_URL, LLMVIZ_MLX_MODEL, LLMVIZ_MLX_LAYERS, LLMVIZ_MLX_CF_ID, LLMVIZ_MLX_CF_SECRET
 EnvironmentFile=-/var/lib/llmviz/mlx.env
-ExecStart=/var/lib/llmviz/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8802 --workers 1
+ExecStart=/var/lib/llmviz/venv/bin/opentelemetry-instrument /var/lib/llmviz/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8802 --workers 1
 Restart=on-failure
 RestartSec=5
 # Memory guard: 4GB box shared with WordPress + NeuraNetViz. A runaway inference
