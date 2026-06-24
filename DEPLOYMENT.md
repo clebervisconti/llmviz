@@ -54,8 +54,14 @@ Browser ──► Cloudflare (proxied DNS, SSL) ──► VPS 129.121.49.96 (Ope
 ## Update pipeline
 
 Local edit → `git push` → VPS `cd /var/lib/llmviz/repo && git pull` → `systemctl restart llmviz`.
-Optionally wire the AgentOS-style cron pull or a Claude Code Stop hook later; manual pull is
-fine for v1.
+
+**Automated since 2026-06-24** via a Claude Code **Stop hook** (`.claude/sync-and-deploy.sh`,
+registered in `.claude/settings.json`). On every Stop it auto-commits local changes, pushes to
+`origin/main`, and — only when new commits land on origin — SSHes to the VPS, `git pull --ff-only`s
+`/var/lib/llmviz/repo`, and restarts `llmviz`. It always exits 0 (never blocks the session),
+single-flights via a lock, and logs to `.claude/deploy.log` (gitignored). SSH key comes from the
+Keychain (`hostgator-vps-ssh-key`); host/port from `~/.env.hostgator` — no secrets in the repo.
+To pause auto-deploy, remove the `Stop` block from `.claude/settings.json`. Manual pull still works.
 
 ## Post-deploy checklist
 
