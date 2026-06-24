@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 .DS_Store
+# Stop-hook artifacts (auto sync + deploy)
+.claude/deploy.log
+.claude/.deploy.lock
 # HF model cache is created on the VPS at runtime; never commit weights
 models/
 *.safetensors
