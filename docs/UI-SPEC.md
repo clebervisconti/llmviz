@@ -122,7 +122,7 @@ Animation grammar (same as NeuraNetViz forward pass):
 ## 5. Logo & assets
 
 Logos live at:
-`/Volumes/STORAGE/Users/clebervisconti/Library/Mobile Documents/com~apple~CloudDocs/Cyberlabs/ai-workspace/shared/cs-branding/`
+`/Volumes/STORAGE/Cyberlabs/shared/cs-branding/`
 - Topbar: `Icone fundo preto.png` (icon-only, ≥40px) + CSS wordmark.
 - Favicon: derive from icon PNG.
 - Never recolor/distort; min padding = ¼ logo width.

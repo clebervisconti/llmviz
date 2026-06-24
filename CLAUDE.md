@@ -35,7 +35,7 @@ to **build, deploy, and polish** it, cheaply and faithfully.
 - **Cloudflare**: token `CF_API_TOKEN_ACCESS` in `~/.env.cloudflare`. Use `cloudflare-manager`
   for DNS. Zone `clebervisconti.com` id is in the global CLAUDE.md.
 - **Branding**: the `cs-branding` skill is canonical; logos under
-  `…/Cyberlabs/ai-workspace/shared/cs-branding/`. `docs/UI-SPEC.md` already distilled it.
+  `/Volumes/STORAGE/Cyberlabs/shared/cs-branding/`. `docs/UI-SPEC.md` already distilled it.
 
 ## Conventions
 - Keep it small and readable (~NeuraNetViz's ~1,800 LOC ballpark).

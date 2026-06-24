@@ -1,6 +1,6 @@
 # Reference: NeuraNetViz (the sibling app)
 
-> Path: `/Volumes/STORAGE/Users/clebervisconti/Library/Mobile Documents/com~apple~CloudDocs/Cyberlabs/Apps/NeuraNetViz`
+> Path: `/Volumes/STORAGE/Cyberlabs/Web Apps/NeuraNetViz`
 > LLMViz must look and feel like the same product family. This doc summarizes what to reuse
 > and what to adapt, so the development model (Opus) doesn't need to re-explore that repo.
 
