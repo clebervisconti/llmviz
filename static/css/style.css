@@ -21,6 +21,11 @@
   --cv-border-strong:rgba(255, 255, 255, 0.24);
   --cv-warn:         #f0b400;
 
+  /* Scoped Q/K/V triad — used ONLY in the "inside a block" attention sub-view (UI-SPEC §6a). */
+  --cv-q:            #7c6cff;   /* Query  — violet */
+  --cv-k:            #ff8a3d;   /* Key    — amber  */
+  --cv-v:            #28d600;   /* Value  — green (the existing Verde) */
+
   --cv-font-heading: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --cv-font-body:    'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --cv-font-mono:    'JetBrains Mono', 'SF Mono', Menlo, monospace;
@@ -216,6 +221,43 @@ main { flex: 1; display: grid; grid-template-columns: 320px 1fr 360px; gap: 18px
   0% { transform: scale(1); } 45% { transform: scale(1.06); } 100% { transform: scale(1); }
 }
 
+/* view toggle + block/head navigator (block view) */
+.view-toggle { display: inline-flex; gap: 4px; background: rgba(0,0,0,0.22); border: 1px solid var(--cv-border); border-radius: 999px; padding: 3px; }
+.vt-btn {
+  background: transparent; border: none; color: var(--cv-text-muted); cursor: pointer;
+  font-family: var(--cv-font-heading); font-size: 10px; letter-spacing: 0.08em; font-weight: 600;
+  text-transform: uppercase; padding: 5px 12px; border-radius: 999px; transition: all .15s;
+}
+.vt-btn:hover { color: var(--cv-text); }
+.vt-btn.active { background: var(--cv-accent-muted); color: var(--cv-accent); box-shadow: 0 0 8px rgba(40,214,0,0.2); }
+
+.block-nav {
+  display: flex; gap: 22px; align-items: center; margin-bottom: 10px; padding: 7px 12px;
+  background: rgba(0,0,0,0.2); border: 1px solid var(--cv-border); border-radius: 8px;
+  font-family: var(--cv-font-mono); font-size: 11px; color: var(--cv-text-muted);
+}
+.bn-group { display: inline-flex; align-items: center; gap: 7px; }
+.bn-lbl { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--cv-text-faint); }
+.bn-step {
+  background: var(--cv-bg-overlay); border: 1px solid var(--cv-border-strong); color: var(--cv-text);
+  width: 22px; height: 22px; border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center; transition: all .15s;
+}
+.bn-step:hover { border-color: var(--cv-accent); color: var(--cv-accent); }
+.block-nav output { color: var(--cv-accent); min-width: 38px; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* block view SVG */
+#pipeline .stage-label { fill: var(--cv-text-faint); }
+#pipeline .block-more { font-family: var(--cv-font-heading); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; fill: var(--cv-text-faint); }
+#pipeline .node-label { font-family: var(--cv-font-heading); font-size: 11px; font-weight: 600; fill: var(--cv-text); }
+#pipeline .qkv-cell { cursor: help; }
+#pipeline .qkv-cell:hover rect:first-child { stroke-opacity: 1; }
+#pipeline .sankey { pointer-events: none; transition: opacity .3s; }
+#pipeline .sankey.flowing { opacity: 0.85 !important; }
+#pipeline .attn-grid { cursor: help; }
+#pipeline .residual { pointer-events: none; }
+#pipeline .out-node, #pipeline .mlp-node { cursor: help; }
+
 .viz-tooltip {
   position: absolute; pointer-events: none; opacity: 0; transform: translate(-50%, calc(-100% - 12px));
   background: rgba(15,18,24,0.96); border: 1px solid var(--cv-accent); border-radius: 8px; padding: 10px 13px;
@@ -261,6 +303,13 @@ main { flex: 1; display: grid; grid-template-columns: 320px 1fr 360px; gap: 18px
 .predictions .pct { color: var(--cv-text-muted); text-align: right; font-variant-numeric: tabular-nums; }
 .predictions li.top .label, .predictions li.top .pct { color: var(--cv-accent); }
 .predictions li.top .bar > .samp { box-shadow: var(--cv-glow); }
+.predictions .samp-tag {
+  font-family: var(--cv-font-heading); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #06200a; background: var(--cv-accent); border-radius: 4px; padding: 1px 5px; margin-left: 7px; vertical-align: middle;
+}
+.predictions li.picked:not(.top) .label { color: var(--cv-text); }
+.predictions li.picked .bar > .samp { box-shadow: var(--cv-glow); }
+.temp-caption { font-family: var(--cv-font-mono); font-size: 10px; color: var(--cv-text-faint); margin-top: 4px; letter-spacing: 0.02em; }
 .bars-legend { display: flex; gap: 16px; font-family: var(--cv-font-mono); font-size: 9.5px; color: var(--cv-text-faint); margin: 4px 0 2px; letter-spacing: 0.04em; }
 .bars-legend i { display: inline-block; width: 14px; height: 8px; margin-right: 5px; vertical-align: middle; border-radius: 2px; }
 .bars-legend i.raw { border: 1px solid rgba(255,255,255,0.5); }

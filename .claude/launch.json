@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "llmviz",
-      "runtimeExecutable": ".venv/bin/uvicorn",
-      "runtimeArgs": ["app.main:app", "--host", "127.0.0.1", "--port", "8810"],
+      "runtimeExecutable": "/Volumes/STORAGE/Cyberlabs/Web Apps/LLMViz/.venv/bin/python",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8810"],
       "port": 8810
     }
   ]

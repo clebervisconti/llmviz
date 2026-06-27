@@ -34,7 +34,8 @@ def _apply_sampling(logits_row: np.ndarray, temperature: float, top_k: int) -> n
 
 
 def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
-                  generated: list[int], head=None, focus_layer=None) -> dict:
+                  generated: list[int], head=None, focus_layer=None,
+                  want_qkv: bool = False) -> dict:
     import torch
 
     tok, model = MANAGER.get(tier)
@@ -42,12 +43,39 @@ def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
     ids = (prompt_ids + list(generated))[: internals.MAX_SEQ]
     input_ids = torch.tensor([ids])
 
-    out = model(
-        input_ids,
-        output_attentions=True,
-        output_hidden_states=True,
-        use_cache=False,
-    )
+    # When the expanded-block view is showing, capture the real Q/K/V of the focus layer
+    # via a forward hook on its fused c_attn projection (GPT-2 splits its output into q,k,v).
+    blocks = model.transformer.h
+    if want_qkv:
+        focus_layer = (len(blocks) - 1) if focus_layer is None else max(0, min(int(focus_layer), len(blocks) - 1))
+    captured: dict = {}
+    hook = None
+    if want_qkv:
+        hook = blocks[focus_layer].attn.c_attn.register_forward_hook(
+            lambda _m, _i, o: captured.__setitem__("qkv", o.detach())
+        )
+
+    try:
+        out = model(
+            input_ids,
+            output_attentions=True,
+            output_hidden_states=True,
+            use_cache=False,
+        )
+    finally:
+        if hook is not None:
+            hook.remove()
+
+    qkv = None
+    if want_qkv and "qkv" in captured:
+        n_embd, n_head = model.config.n_embd, model.config.n_head
+        q, k, v = captured["qkv"][0].split(n_embd, dim=-1)        # each (seq, n_embd)
+        head_dim = n_embd // n_head
+
+        def _to_heads(t):
+            return t.reshape(t.shape[0], n_head, head_dim).numpy()  # (seq, n_head, head_dim)
+
+        qkv = (_to_heads(q), _to_heads(k), _to_heads(v))
 
     # hidden_states: tuple of (1, seq, dim) — index 0 is the embedding output
     hs = [h[0].numpy() for h in out.hidden_states]
@@ -77,5 +105,5 @@ def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
         attentions=attentions, hiddens=hiddens,
         logits_raw=logits_raw, logits_sampled=logits_proc, sampled=sampled,
         id_to_text=lambda i: tok.decode([i]),
-        done=done, head=head, focus_layer=focus_layer,
+        done=done, head=head, focus_layer=focus_layer, qkv=qkv,
     )

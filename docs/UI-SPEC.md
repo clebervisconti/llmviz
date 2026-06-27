@@ -134,5 +134,20 @@ Logos live at:
 - ✅ All data values in JetBrains Mono. ❌ No prose in mono.
 - ✅ `prefers-reduced-motion` guard on every animation. ❌ No unguarded animations.
 - ✅ Vanilla JS + SVG/Canvas, no build step. ❌ No React/Vue/bundlers.
-- ✅ Border radius ≥10px. ❌ No off-brand colors (blues/purples/reds) anywhere.
+- ✅ Border radius ≥10px. ❌ No off-brand colors (blues/purples/reds) anywhere — **except the scoped Q/K/V triad below**.
 - ✅ English UI text (matching NeuraNetViz). Keep sentences short — audience is students.
+
+### 6a. Q/K/V color triad — scoped exception (amended 2026-06-27)
+
+To match the Transformer-Explainer "inside one block" view (user-approved, see the
+project plan), a small named hue triad is permitted **only** within the expanded-block
+attention sub-view — the Q/K/V strips and the ribbons that flow from them. Defined as CSS
+custom properties so they live in exactly one place:
+
+- `--cv-q` Query = blue/violet `#7c6cff`
+- `--cv-k` Key   = warm red/amber `#ff8a3d`
+- `--cv-v` Value = green `#28d600` (the existing Verde — Value is "what gets carried forward")
+
+Everywhere else the rule above still holds: no blues/purples/reds in the overview pipeline,
+panels, chrome, controls, or probability bars. This triad is a teaching device for one
+sub-view, not a palette expansion.

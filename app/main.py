@@ -64,6 +64,7 @@ class GenerateReq(BaseModel):
     generated_text: str = Field(default="", max_length=4000)   # used by the MLX/GEMMA tier
     head: Optional[int] = None
     focus_layer: Optional[int] = None
+    want_qkv: bool = False        # expanded-block view: extract real Q/K/V for the focus layer
 
 
 def _engine_of(tier: str) -> str:
@@ -159,6 +160,7 @@ async def generate_step(req: GenerateReq):
         out = demo_script.generate_step(
             prompt, req.model, req.temperature, req.top_k,
             req.generated, head=req.head, focus_layer=req.focus_layer,
+            want_qkv=req.want_qkv,
         )
         out["engine"] = "scripted"
         return out
@@ -174,7 +176,7 @@ async def generate_step(req: GenerateReq):
         out = await asyncio.to_thread(   # blocking CPU forward pass off the event loop
             inference.generate_step,
             prompt, req.model, req.temperature, req.top_k,
-            req.generated, req.head, req.focus_layer,
+            req.generated, req.head, req.focus_layer, req.want_qkv,
         )
         out["engine"] = "live"
         return out

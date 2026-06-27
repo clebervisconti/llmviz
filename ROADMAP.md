@@ -100,3 +100,20 @@
 - Compare two model sizes side by side on the same prompt.
 - "Guided tour" overlay that walks a first-timer through the 9 steps.
 - Save/share a specific prompt+settings as a URL.
+
+## Phase 6 — Transformer-Explainer "inside one block" view  *(in progress, started 2026-06-27)*
+Brings the visual language of poloclub.github.io/transformer-explainer into LLMViz (user request).
+- [x] **Backend: real Q/K/V.** Forward hook on the focus layer's fused `c_attn` extracts genuine
+      per-token Q/K/V; `internals.pack_qkv` downsamples to per-token norms + 8-bucket mini-vectors
+      (uint8, focus layer only). `GenerateReq.want_qkv` gates it; DEMO synthesizes a matching shape
+      (`demo_script._synth_qkv`). Verified shape + payload < 50KB across all tiers (demo/nano/micro/small).
+- [ ] **Frontend: `block_viz.js`** — expanded single block: token column → Q/K/V color strips →
+      attention grid (Query·Key→softmax) → Out → MLP → residual, connected by Sankey ribbons; head
+      selector, block navigator, "+N−1 more identical blocks" stacked-card motif. Overview⇄Block toggle.
+- [ ] **Frontend: probabilities polish + ribbon animation** (sampled-token tag, animated bars, inline
+      temperature; all motion reduced-motion-guarded).
+- **Deviation from frozen spec:** UI-SPEC §6 amended (new §6a) to allow a scoped Q/K/V hue triad
+      (`--cv-q` violet / `--cv-k` amber / `--cv-v` green) **only** inside the attention sub-view —
+      user-approved 2026-06-27. Rest of the app keeps the no-off-brand-colors rule.
+- **Before live:** benchmark `want_qkv` on the VPS NANO/MICRO path before enabling (one extra
+      focus-layer tensor; expected negligible, but confirm RAM/latency). DEMO carries it meanwhile.

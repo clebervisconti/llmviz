@@ -73,6 +73,23 @@ def _causal_attention(seq: int, heads: int, layer: int, rng: np.random.Generator
     return out
 
 
+def _synth_qkv(seq: int, head_dim: int, n_heads: int, layer: int,
+               rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Synthesize believable (seq, n_heads, head_dim) Q/K/V for the DEMO expanded-block
+    view. Q/K norms drift up with position; V carries a mild depth-dependent gain. Honestly
+    scripted — internally consistent so the lesson reads correctly, but not from a real LLM."""
+    def make(scale_with_pos: float, base: float) -> np.ndarray:
+        t = np.empty((seq, n_heads, head_dim), dtype=np.float32)
+        for i in range(seq):
+            gain = base + scale_with_pos * (i / max(seq - 1, 1))
+            t[i] = rng.standard_normal((n_heads, head_dim)).astype(np.float32) * gain
+        return t
+    q = make(0.6, 0.8)
+    k = make(0.5, 0.9)
+    v = make(0.2, 1.0 + 0.04 * layer)
+    return q, k, v
+
+
 def _logits(step: int, temperature: float, top_k: int) -> tuple[np.ndarray, np.ndarray, dict]:
     """Raw vocab logits (target word on top) and the temperature/top-k-processed version."""
     rng = np.random.default_rng(1000 + step)
@@ -94,7 +111,8 @@ def _logits(step: int, temperature: float, top_k: int) -> tuple[np.ndarray, np.n
 
 
 def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
-                  generated: list[int], head=None, focus_layer=None) -> dict:
+                  generated: list[int], head=None, focus_layer=None,
+                  want_qkv: bool = False) -> dict:
     spec = MODELS_BY_ID.get(tier, MODELS_BY_ID["demo"])
     n_layers, n_heads, dim = spec["layers"], spec["heads"], min(spec["dim"], 48)
 
@@ -124,12 +142,19 @@ def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
     raw, proc, sampled = _logits(step, temperature, top_k)
     done = step >= len(CONTINUATION) - 1 or seq >= internals.MAX_SEQ
 
+    qkv = None
+    if want_qkv:
+        focus = (n_layers - 1) if focus_layer is None else max(0, min(int(focus_layer), n_layers - 1))
+        focus_layer = focus
+        head_dim = max(1, dim // n_heads)
+        qkv = _synth_qkv(seq, head_dim, n_heads, focus, np.random.default_rng(31 * focus + 5))
+
     return internals.assemble_step(
         step=step, tokens=tokens, embeddings=embeddings,
         attentions=attentions, hiddens=hiddens,
         logits_raw=raw, logits_sampled=proc, sampled=sampled,
         id_to_text=_logits_id_to_text,   # demo logit rows are indexed by DEMO_VOCAB position
-        done=done, head=head, focus_layer=focus_layer,
+        done=done, head=head, focus_layer=focus_layer, qkv=qkv,
     )
 
 

@@ -27,7 +27,10 @@
     prompt: "The cat sat on the",
     generated: [], lastStep: null, running: false, runToken: 0, epoch: 0,
     attnLayer: 0, attnMode: "mean", // "mean" | "single"
+    view: "overview", attnHead: 0,  // "overview" | "block"; head index for the block view
   };
+
+  const inBlockView = () => state.view === "block";
 
   // ---------- API ----------
   async function api(path, body, _tries) {
@@ -113,13 +116,20 @@
     const ul = $("predictions"); ul.innerHTML = "";
     const sampled = data.logits_sampled || [];
     const rawMap = {}; (data.logits_raw || []).forEach((d) => (rawMap[d.id] = d.p));
+    // echo the temperature so the rail explains why the bars are sharp/flat
+    const tc = $("temp-caption");
+    if (tc) tc.textContent = `temperature ${state.temp.toFixed(2)} — higher = flatter distribution`;
     if (!sampled.length) { ul.innerHTML = '<li class="empty">run to see the next-token distribution</li>'; return; }
+    const pickedId = data.sampled && data.sampled.id;
     sampled.forEach((d, i) => {
       const li = document.createElement("li");
-      if (i === 0) li.className = "top";
+      const isPicked = pickedId != null && d.id === pickedId;
+      li.className = (i === 0 ? "top" : "") + (isPicked ? " picked" : "");
       const raw = rawMap[d.id] || 0;
+      // a "sampled" tag marks the token actually drawn — instructive when it isn't the top-1
+      const tag = isPicked ? '<span class="samp-tag">sampled</span>' : "";
       li.innerHTML =
-        `<span class="label">${escapeHtml(d.text)}</span>` +
+        `<span class="label">${escapeHtml(d.text)}${tag}</span>` +
         `<span class="bar"><span class="raw" style="width:${(raw * 100).toFixed(1)}%"></span>` +
         `<span class="samp" style="width:${(d.p * 100).toFixed(1)}%"></span></span>` +
         `<span class="pct">${(d.p * 100).toFixed(0)}%</span>`;
@@ -209,17 +219,67 @@
     const svg = $("pipeline");
     const m = state.models.find((x) => x.id === state.model);
     if (m) data.dim = m.dim;   // let the embeddings tooltip name the real vector size
-    const groups = window.LLMViz.pipeline.render(svg, data);
+    const caps = data.caps || { attention: true, embeddings: true };
+
+    // the expanded-block view needs white-box internals; fall back to overview otherwise
+    const blockable = inBlockView() && caps.attention !== false;
+    let groups, renderer;
+    if (blockable) {
+      groups = window.LLMViz.block.render(svg, data, { layer: state.attnLayer, head: state.attnHead });
+      renderer = window.LLMViz.block;
+    } else {
+      groups = window.LLMViz.pipeline.render(svg, data);
+      renderer = window.LLMViz.pipeline;
+    }
+    updateBlockNav(data);
+
     renderPredictions(data);
     // some backends (GEMMA/MLX) can't expose attention — hide the panel, show the note
-    const caps = data.caps || { attention: true, embeddings: true };
     $("attn-section").style.display = caps.attention ? "" : "none";
     $("attn-note").style.display = caps.attention ? "none" : "";
     if (caps.attention) renderAttentionControls(data);
     renderTextStream();
     $("step-counter").textContent = data.tokens ? `${data.tokens.length} tokens · step ${data.step + 1}` : "";
-    if (animate) return window.LLMViz.pipeline.animate(groups);
+    if (animate) return renderer.animate(groups);
     return Promise.resolve();
+  }
+
+  function setView(view) {
+    if (view === state.view) return;
+    state.view = view;
+    [...$("view-toggle").children].forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+    $("block-nav").style.display = inBlockView() ? "" : "none";
+    const legend = document.querySelector(".legend");
+    if (legend) legend.style.display = inBlockView() ? "none" : "";
+    // re-fetch the current frame with the right params (block view needs real Q/K/V)
+    if (!state.running) doStep(false, true).catch(() => {});
+    else if (state.lastStep) renderAll(state.lastStep, false);
+  }
+
+  function stepNav(which, delta) {
+    const m = state.models.find((x) => x.id === state.model);
+    if (which === "layer") {
+      const n = (state.lastStep && state.lastStep.layers && state.lastStep.layers.length) || (m && m.layers) || 1;
+      state.attnLayer = Math.max(0, Math.min(n - 1, state.attnLayer + delta));
+    } else {
+      const n = (m && m.heads) || 1;
+      state.attnHead = Math.max(0, Math.min(n - 1, state.attnHead + delta));
+    }
+    // keep the attention-panel layer slider in sync, then re-render with new focus
+    const sl = $("attn-layer"); if (sl) { sl.value = state.attnLayer; $("attn-layer-out").textContent = state.attnLayer; }
+    if (!state.running) doStep(false, true).catch(() => {});
+  }
+
+  // keep the block/head steppers in sync with the active model's geometry
+  function updateBlockNav(data) {
+    const m = state.models.find((x) => x.id === state.model);
+    const nLayers = (data && data.layers && data.layers.length) || (m && m.layers) || 1;
+    const nHeads = (m && m.heads) || 1;
+    if (state.attnLayer > nLayers - 1) state.attnLayer = nLayers - 1;
+    if (state.attnHead > nHeads - 1) state.attnHead = nHeads - 1;
+    const bo = $("block-out"), ho = $("head-out");
+    if (bo) bo.textContent = `${state.attnLayer + 1} / ${nLayers}`;
+    if (ho) ho.textContent = `${state.attnHead + 1} / ${nHeads}`;
   }
 
   // ---------- generation ----------
@@ -242,8 +302,14 @@
       if (state.model === "browser") {
         data = await window.LLMViz.browser.generateStep(state.prompt, genText.join(""), state.temp, state.topk);
       } else {
-        data = await api("/api/generate_step", stepBody(
-          state.attnMode === "single" ? { head: 0, focus_layer: state.attnLayer } : {}));
+        let extra = {};
+        if (inBlockView()) {
+          // expanded-block view drives a single head + focus layer and asks for real Q/K/V
+          extra = { head: state.attnHead, focus_layer: state.attnLayer, want_qkv: true };
+        } else if (state.attnMode === "single") {
+          extra = { head: 0, focus_layer: state.attnLayer };
+        }
+        data = await api("/api/generate_step", stepBody(extra));
       }
       if (myEpoch !== state.epoch) return null;   // superseded — ignore stale render
       state.lastStep = data;
@@ -352,6 +418,14 @@
       btn.classList.toggle("active", state.attnMode === "mean");
       doStep(false, true).catch(() => {});
     });
+
+    // view toggle: Overview ⇄ Inside a block
+    [...$("view-toggle").children].forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+    // block + head steppers (only relevant in block view)
+    $("block-prev").addEventListener("click", () => stepNav("layer", -1));
+    $("block-next").addEventListener("click", () => stepNav("layer", +1));
+    $("head-prev").addEventListener("click", () => stepNav("head", -1));
+    $("head-next").addEventListener("click", () => stepNav("head", +1));
 
     $("run").addEventListener("click", runAll);
     $("step").addEventListener("click", () => { state.running = false; doStep(true, false); });

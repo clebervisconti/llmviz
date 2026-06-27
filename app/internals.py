@@ -36,6 +36,56 @@ def quantize_u8(matrix: np.ndarray) -> list[list[int]]:
     return (norm * 255.0).round().astype(np.uint8).tolist()
 
 
+def quantize_u8_1d(vec: np.ndarray) -> list[int]:
+    """Normalize a 1D vector to 0..255 uint8 (e.g. per-token Q/K/V norms)."""
+    v = np.asarray(vec, dtype=np.float32).ravel()
+    lo, hi = float(v.min()), float(v.max())
+    if hi - lo < 1e-9:
+        norm = np.zeros_like(v)
+    else:
+        norm = (v - lo) / (hi - lo)
+    return (norm * 255.0).round().astype(np.uint8).tolist()
+
+
+QKV_BUCKETS = 8       # mini-vector resolution per token in the Q/K/V strips
+
+
+def pack_qkv(q: np.ndarray, k: np.ndarray, v: np.ndarray, head: int | None = 0) -> dict:
+    """
+    q, k, v: arrays shaped (seq, n_head, head_dim) for ONE transformer layer.
+    For the selected head, emit a compact, legible strip per token:
+      - *_norm: per-token L2 norm of that token's Q/K/V vector (uint8)
+      - *_bars: an 8-bucket mean-abs mini-vector per token (uint8) — the "little vector" look
+    Tiny payload (~1.7KB at seq 64) so the expanded-block view stays under budget.
+    """
+    qa, ka, va = (np.asarray(x, dtype=np.float32) for x in (q, k, v))
+    n_head = qa.shape[1]
+    h = max(0, min(int(head or 0), n_head - 1))
+    qh, kh, vh = qa[:, h, :], ka[:, h, :], va[:, h, :]   # each (seq, head_dim)
+    head_dim = int(qh.shape[1])
+
+    def bars(mat: np.ndarray) -> list[list[int]]:
+        # mean-abs over contiguous slices of head_dim, per token, resampled to QKV_BUCKETS.
+        nb = min(QKV_BUCKETS, mat.shape[1])              # avoid empty slices when head_dim < 8
+        buckets = [np.abs(s).mean(axis=1) for s in np.array_split(mat, nb, axis=1)]
+        grid = np.stack(buckets, axis=1)                 # (seq, nb)
+        if nb < QKV_BUCKETS:                             # nearest-upsample so width is always 8
+            idx = np.floor(np.linspace(0, nb - 1e-9, QKV_BUCKETS)).astype(int)
+            grid = grid[:, idx]
+        return quantize_u8(grid)
+
+    return {
+        "head": h,
+        "head_dim": head_dim,
+        "q_norm": quantize_u8_1d(np.linalg.norm(qh, axis=1)),
+        "k_norm": quantize_u8_1d(np.linalg.norm(kh, axis=1)),
+        "v_norm": quantize_u8_1d(np.linalg.norm(vh, axis=1)),
+        "q_bars": bars(qh),
+        "k_bars": bars(kh),
+        "v_bars": bars(vh),
+    }
+
+
 def top_links(attn_row_matrix: np.ndarray, k: int = TOP_LINKS) -> list[dict]:
     """
     Given a seq×seq attention matrix (row = query token, col = key token),
@@ -143,23 +193,28 @@ def assemble_step(
     done: bool,
     head: int | None = None,
     focus_layer: int | None = None,
+    qkv: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None,
 ) -> dict:
     """
     Build the /api/generate_step response from numpy internals. Shared by the real
     (torch) inference path and the scripted DEMO path so the frontend is identical.
     `head`/`focus_layer` optionally request a single head's full matrix for one layer
     (advanced attention view); all other layers stay mean-over-heads.
+    `qkv` is an optional (q, k, v) triple of (seq, n_head, head_dim) arrays for the
+    focus layer only — attached as layers[focus_layer]["qkv"] for the expanded-block view.
     """
     layers = []
     for li, (attn, hid) in enumerate(zip(attentions, hiddens)):
-        want_head = head if (focus_layer is not None and li == focus_layer) else None
-        layers.append(
-            {
-                "index": li,
-                "attention": pack_attention(attn, head=want_head),
-                "hidden_norm": hidden_norm(hid),
-            }
-        )
+        is_focus = focus_layer is not None and li == focus_layer
+        want_head = head if is_focus else None
+        entry = {
+            "index": li,
+            "attention": pack_attention(attn, head=want_head),
+            "hidden_norm": hidden_norm(hid),
+        }
+        if is_focus and qkv is not None:
+            entry["qkv"] = pack_qkv(qkv[0], qkv[1], qkv[2], head=head)
+        layers.append(entry)
     return {
         "step": step,
         "caps": {"attention": True, "embeddings": True, "layers_static": False},

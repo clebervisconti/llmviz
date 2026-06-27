@@ -23,7 +23,7 @@
 
   <title>LLMViz · Watch a Language Model Think · Cleber Visconti</title>
   <link rel="icon" type="image/png" href="/static/img/cs-icon.png?v=11">
-  <link rel="stylesheet" href="/static/css/style.css?v=11">
+  <link rel="stylesheet" href="/static/css/style.css?v=12">
 </head>
 <body class="cv-theme">
   <canvas id="bgfx"></canvas>
@@ -89,7 +89,25 @@
     <section class="panel center">
       <div class="net-header">
         <h2 class="panel-title">// PIPELINE</h2>
+        <div class="view-toggle" id="view-toggle">
+          <button class="vt-btn active" data-view="overview">Overview</button>
+          <button class="vt-btn" data-view="block">Inside a block</button>
+        </div>
         <span class="muted small" id="step-counter"></span>
+      </div>
+      <div class="block-nav" id="block-nav" style="display:none">
+        <span class="bn-group">
+          <span class="bn-lbl">block</span>
+          <button class="bn-step" id="block-prev" aria-label="previous block">‹</button>
+          <output id="block-out">1 / 1</output>
+          <button class="bn-step" id="block-next" aria-label="next block">›</button>
+        </span>
+        <span class="bn-group">
+          <span class="bn-lbl">head</span>
+          <button class="bn-step" id="head-prev" aria-label="previous head">‹</button>
+          <output id="head-out">1 / 1</output>
+          <button class="bn-step" id="head-next" aria-label="next head">›</button>
+        </span>
       </div>
       <div class="net-stage">
         <svg id="pipeline" viewBox="0 0 960 600" preserveAspectRatio="xMidYMid meet"></svg>
@@ -111,6 +129,7 @@
         <span><i class="samp"></i>after temp + top-k</span>
       </div>
       <ul class="predictions" id="predictions"><li class="empty">run to see the next-token distribution</li></ul>
+      <div class="temp-caption" id="temp-caption"></div>
 
       <h3 class="sub-title">// OUTPUT TEXT</h3>
       <div class="text-stream" id="text-stream"><span class="prompt-part">The cat sat on the</span><span class="cursor">▌</span></div>
@@ -152,10 +171,11 @@
     </div>
   </div>
 
-  <script src="/static/js/bgfx.js?v=11"></script>
-  <script src="/static/js/viz.js?v=11"></script>
-  <script src="/static/js/attention.js?v=11"></script>
-  <script src="/static/js/browser_infer.js?v=11"></script>
-  <script src="/static/js/controls.js?v=11"></script>
+  <script src="/static/js/bgfx.js?v=12"></script>
+  <script src="/static/js/viz.js?v=12"></script>
+  <script src="/static/js/block_viz.js?v=12"></script>
+  <script src="/static/js/attention.js?v=12"></script>
+  <script src="/static/js/browser_infer.js?v=12"></script>
+  <script src="/static/js/controls.js?v=12"></script>
 </body>
 </html>
