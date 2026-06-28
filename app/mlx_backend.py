@@ -25,8 +25,8 @@ import numpy as np
 from . import internals
 
 MLX_URL = os.environ.get("LLMVIZ_MLX_URL", "").rstrip("/")
-MLX_MODEL = os.environ.get("LLMVIZ_MLX_MODEL", "mlx-community/gemma-2-9b-it-4bit")
-MLX_LAYERS = int(os.environ.get("LLMVIZ_MLX_LAYERS", "42"))   # Gemma-2-9B = 42 layers
+MLX_MODEL = os.environ.get("LLMVIZ_MLX_MODEL", "mlx-community/gemma-3-4b-it-4bit")
+MLX_LAYERS = int(os.environ.get("LLMVIZ_MLX_LAYERS", "34"))   # Gemma-3-4B = 34 layers
 CF_ID = os.environ.get("LLMVIZ_MLX_CF_ID", "")
 CF_SECRET = os.environ.get("LLMVIZ_MLX_CF_SECRET", "")
 

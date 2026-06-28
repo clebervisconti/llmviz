@@ -34,9 +34,9 @@ MODELS = [
     {"id": "small", "label": "SMALL", "hf": "gpt2-medium", "params": "355M",
      "layers": 24, "heads": 16, "dim": 1024, "lazy": True,
      "blurb": "GPT-2 medium — 355M params, 24 layers. Loaded on demand."},
-    {"id": "gemma", "label": "GEMMA", "hf": None, "params": "9B",
-     "layers": 42, "heads": 16, "dim": 3584, "engine": "mlx",
-     "blurb": "Gemma 2 9B on Apple MLX (Mac mini, via tunnel) — a real, capable model. Shows "
+    {"id": "gemma", "label": "GEMMA", "hf": None, "params": "4B",
+     "layers": 34, "heads": 8, "dim": 2560, "engine": "mlx",
+     "blurb": "Gemma 3 4B on Apple MLX (Mac mini, via tunnel) — a real, modern model. Shows "
               "real tokens, probabilities & generated text; attention/layers are white-box only "
               "(use NANO/MICRO for those)."},
 ]

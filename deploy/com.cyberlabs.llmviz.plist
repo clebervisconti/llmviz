@@ -40,7 +40,8 @@
     <key>LLMVIZ_LIVE</key><string>1</string>
     <key>LLMVIZ_LIVE_TIERS</key><string>nano,micro,small</string>
     <key>LLMVIZ_MLX_URL</key><string>http://localhost:8081</string>
-    <key>LLMVIZ_MLX_MODEL</key><string>mlx-community/gemma-2-9b-it-4bit</string>
+    <key>LLMVIZ_MLX_MODEL</key><string>mlx-community/gemma-3-4b-it-4bit</string>
+    <key>LLMVIZ_MLX_LAYERS</key><string>34</string>
     <key>HF_HOME</key><string>/Volumes/STORAGE/Cyberlabs/models</string>
     <key>HF_HUB_CACHE</key><string>/Volumes/STORAGE/Cyberlabs/models</string>
   </dict>
