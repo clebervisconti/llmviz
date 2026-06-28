@@ -27,6 +27,15 @@ from . import internals
 MLX_URL = os.environ.get("LLMVIZ_MLX_URL", "").rstrip("/")
 MLX_MODEL = os.environ.get("LLMVIZ_MLX_MODEL", "mlx-community/gemma-3-4b-it-4bit")
 MLX_LAYERS = int(os.environ.get("LLMVIZ_MLX_LAYERS", "34"))   # Gemma-3-4B = 34 layers
+
+
+def _derive_label(model_id: str) -> str:
+    """A human label like 'GEMMA 3 4B' parsed from the MLX model id (override: LLMVIZ_MLX_LABEL)."""
+    name = model_id.split("/")[-1].replace("-it", "").replace("-4bit", "").replace("-", " ")
+    return name.upper().strip()
+
+
+MLX_LABEL = os.environ.get("LLMVIZ_MLX_LABEL", _derive_label(MLX_MODEL))
 CF_ID = os.environ.get("LLMVIZ_MLX_CF_ID", "")
 CF_SECRET = os.environ.get("LLMVIZ_MLX_CF_SECRET", "")
 
@@ -144,7 +153,7 @@ def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
     return {
         "step": len(tok.encode(generated_text)) if generated_text else 0,
         "engine": "mlx",
-        "model_label": "GEMMA 2 9B",
+        "model_label": MLX_LABEL,
         "caps": {"attention": False, "embeddings": False, "layers_static": True},
         "tokens": tokens,
         "embeddings_2d": [],
