@@ -258,6 +258,24 @@ main { flex: 1; display: grid; grid-template-columns: 320px 1fr 360px; gap: 18px
 #pipeline .residual { pointer-events: none; }
 #pipeline .out-node, #pipeline .mlp-node { cursor: help; }
 
+/* continuously "flowing" comet lines along the ribbons (the alive feel) */
+#pipeline .flow-line {
+  pointer-events: none; stroke-dasharray: 5 13; stroke-linecap: round;
+  animation: flow 1.1s linear infinite; transition: stroke-opacity .2s;
+}
+@keyframes flow { to { stroke-dashoffset: -36; } }
+
+/* hover path-tracing: dim everything except the hovered token's path */
+#pipeline[data-hot] .flow-line:not(.hot) { stroke-opacity: 0.05 !important; }
+#pipeline[data-hot] .qkv-cell:not(.hot) { opacity: 0.22; }
+#pipeline[data-hot] .tok-chip:not(.hot) { opacity: 0.3; }
+#pipeline .flow-line.hot { stroke-opacity: 0.95 !important; stroke-width: 2.6; }
+#pipeline .qkv-cell { transition: opacity .15s; }
+#pipeline .qkv-cell.hot rect:first-child { stroke-opacity: 1; }
+#pipeline .tok-chip { transition: opacity .15s; }
+#pipeline .tok-chip.hot rect { stroke: var(--cv-accent); stroke-width: 1.5; }
+#pipeline .grid-row-hi { fill: none; stroke: #fff; stroke-opacity: 0.85; stroke-width: 1.2; pointer-events: none; }
+
 .viz-tooltip {
   position: absolute; pointer-events: none; opacity: 0; transform: translate(-50%, calc(-100% - 12px));
   background: rgba(15,18,24,0.96); border: 1px solid var(--cv-accent); border-radius: 8px; padding: 10px 13px;

@@ -192,6 +192,17 @@
     edge(bx + bs, by + bs / 2, lx, outY);
     edge(lx + lw, outY, COL.out - ow / 2, outY);
 
+    // continuously flowing comet lines over the edges (the "alive" idle feel; green = on-brand here)
+    function comet(x1, y1, x2, y2) {
+      const mid = (x1 + x2) / 2;
+      svg.appendChild(el("path", { class: "flow-line",
+        d: `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`,
+        fill: "none", stroke: "var(--cv-accent)", "stroke-width": 1.8, "stroke-opacity": 0.5 }));
+    }
+    comet(COL.tokens + 60, outY, bx, by + bs / 2);
+    comet(bx + bs, by + bs / 2, lx, outY);
+    comet(lx + lw, outY, COL.out - ow / 2, outY);
+
     return groups;
   }
 

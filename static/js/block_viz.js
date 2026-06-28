@@ -71,6 +71,18 @@
     return el("path", { d, fill, opacity, class: cls || "sankey" });
   }
 
+  // a thin curved centerline with a CSS-animated dash → "particles flowing" along the path.
+  // Reduced-motion: the global `animation:none` rule freezes it to a static dashed line.
+  function flowLine(x1, y1, x2, y2, color, opacity, width, idx) {
+    const mid = (x1 + x2) / 2;
+    const a = { class: "flow-line",
+      d: `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`,
+      fill: "none", stroke: color, "stroke-width": width || 1.4,
+      "stroke-opacity": opacity, "stroke-linecap": "round" };
+    if (idx != null) a["data-tok"] = idx;
+    return el("path", a);
+  }
+
   function render(svg, data, sel) {
     clear(svg);
     const C = colors();
@@ -79,6 +91,7 @@
     const L = layers[sel.layer] || layers[layers.length - 1] || {};
     const qkv = L.qkv;
     const nLayers = layers.length || 1;
+    const midY = (TOP + BOT) / 2;
     const groups = { tokenG: [], qkvG: [], gridG: null, outG: null, mlpG: null, ribbons: [] };
 
     // ---- defs: directional flow gradients per channel ----
@@ -137,7 +150,7 @@
     shown.forEach((tok, i) => {
       const y = tokY(i);
       const w = 104, x = COL.tok - w / 2;
-      const g = el("g", { class: "tok-chip" });
+      const g = el("g", { class: "tok-chip", "data-tok": i });
       g.appendChild(el("rect", { x, y: y - th / 2 + 2, width: w, height: th - 4, rx: 7,
         fill: "rgba(255,255,255,0.11)", stroke: "rgba(255,255,255,0.32)" }));
       const t = el("text", { x: COL.tok, y: y + 4, class: "tok-text", "text-anchor": "middle" });
@@ -160,7 +173,7 @@
         const y = tokY(i);
         const cw = LANE_W, cx = colx - cw / 2, cy = y - th / 2 + 3, ch = th - 6;
         const nrm = u8(normArr, i);
-        const cell = el("g", { class: "qkv-cell" });
+        const cell = el("g", { class: "qkv-cell", "data-tok": i });
         // backing chip whose opacity reads the vector's overall magnitude (norm)
         cell.appendChild(el("rect", { x: cx, y: cy, width: cw, height: ch, rx: 4,
           fill: color, opacity: (0.12 + 0.32 * nrm).toFixed(3),
@@ -180,11 +193,11 @@
         hoverable(cell, name + " vector",
           `token “${(tok.text || "").trim()}” · ${name} magnitude ${(nrm).toFixed(2)} (head ${sel.head})`);
         lg.appendChild(cell);
-        // faint ribbon token → this lane cell
-        const r = ribbon(COL.tok + 52, y - th / 2 + 3, y + th / 2 - 3,
-          colx - LANE_W / 2, cy, cy + ch, `url(#${gradId})`, (0.18 + 0.5 * nrm).toFixed(3), "sankey lane-ribbon");
-        svg.insertBefore(r, svg.firstChild.nextSibling);
-        groups.ribbons.push(r);
+        // thin flowing line token → this lane cell (thickness/opacity read the norm)
+        const fl = flowLine(COL.tok + 52, y, colx - LANE_W / 2, y,
+          color, (0.2 + 0.55 * nrm).toFixed(3), 1 + 1.6 * nrm, i);
+        svg.insertBefore(fl, svg.firstChild.nextSibling);
+        groups.ribbons.push(fl);
       });
       svg.appendChild(lg);
       groups.qkvG.push(lg);
@@ -226,15 +239,16 @@
     gcap.textContent = "Query · Key → softmax";
     svg.appendChild(gcap);
 
-    // Q and K ribbons feeding the grid (the dot-product inputs)
-    const gmidT = gy, gmidB = gy + GRID_W;
+    // Q and K ribbons feeding the grid (the dot-product inputs) + flowing comets
+    const gmidT = gy, gmidB = gy + GRID_W, gMid = gy + GRID_W / 2;
     groups.ribbons.push(svg.insertBefore(
       ribbon(COL.q + LANE_W / 2, TOP, BOT, gx, gmidT, gmidB, "url(#flowQ)", 0.18, "sankey"), svg.firstChild.nextSibling));
     groups.ribbons.push(svg.insertBefore(
       ribbon(COL.k + LANE_W / 2, TOP, BOT, gx, gmidT, gmidB, "url(#flowK)", 0.18, "sankey"), svg.firstChild.nextSibling));
+    svg.appendChild(flowLine(COL.q + LANE_W / 2, midY, gx, gMid - 8, C.q, 0.5, 2));
+    svg.appendChild(flowLine(COL.k + LANE_W / 2, midY, gx, gMid + 8, C.k, 0.5, 2));
 
     // ---- Out node (attention output) ----
-    const midY = (TOP + BOT) / 2;
     const outG = el("g", { class: "out-node" });
     outG.appendChild(el("rect", { x: COL.out - 30, y: midY - 30, width: 60, height: 60, rx: 10,
       fill: "rgba(40,214,0,0.10)", stroke: "rgba(40,214,0,0.55)" }));
@@ -249,6 +263,8 @@
       ribbon(COL.v + LANE_W / 2, TOP, BOT, COL.out - 30, midY - 28, midY + 28, "url(#flowV)", 0.22, "sankey"), svg.firstChild.nextSibling));
     groups.ribbons.push(svg.insertBefore(
       ribbon(gx + GRID_W, gmidT, gmidB, COL.out - 30, midY - 26, midY + 26, "url(#flowG)", 0.2, "sankey"), svg.firstChild.nextSibling));
+    svg.appendChild(flowLine(COL.v + LANE_W / 2, midY, COL.out - 30, midY - 6, C.v, 0.5, 2));
+    svg.appendChild(flowLine(gx + GRID_W, gMid, COL.out - 30, midY + 6, C.v, 0.45, 2));
 
     // ---- MLP block ----
     const mlpG = el("g", { class: "mlp-node" });
@@ -264,6 +280,7 @@
     groups.mlpG = mlpG;
     groups.ribbons.push(svg.insertBefore(
       ribbon(COL.out + 30, midY - 26, midY + 26, COL.mlp - 34, midY - 30, midY + 30, "url(#flowG)", 0.22, "sankey"), svg.firstChild.nextSibling));
+    svg.appendChild(flowLine(COL.out + 30, midY, COL.mlp - 34, midY, C.v, 0.5, 2.2));
 
     // ---- next-token chip ----
     const ng = el("g", { class: "out-chip" });
@@ -275,6 +292,7 @@
     svg.appendChild(ng);
     groups.ribbons.push(svg.insertBefore(
       ribbon(COL.mlp + 34, midY - 30, midY + 30, COL.next - 36, midY - 16, midY + 16, "url(#flowG)", 0.22, "sankey"), svg.firstChild.nextSibling));
+    svg.appendChild(flowLine(COL.mlp + 34, midY, COL.next - 36, midY, C.v, 0.55, 2.2));
 
     // ---- residual skip connection (token column → after MLP) ----
     const resPath = el("path", {
@@ -286,6 +304,35 @@
     const rlab = el("text", { x: 500, y: TOP - 56, "text-anchor": "middle", class: "emb-caption" });
     rlab.textContent = "+ residual (skip connection)";
     svg.appendChild(rlab);
+
+    // ---- hover path-tracing: highlight one token's Q/K/V + its attention row ----
+    const cs = gseq ? GRID_W / gseq : 0;
+    const rowHi = el("rect", { class: "grid-row-hi", x: gx, y: gy, width: GRID_W,
+      height: Math.max(2, cs), rx: 1, visibility: "hidden" });
+    svg.appendChild(rowHi);
+    let lastHot = -1;
+    function setHot(i) {
+      if (i === lastHot) return;
+      lastHot = i;
+      if (i == null) {
+        svg.removeAttribute("data-hot");
+        svg.querySelectorAll(".hot").forEach((n) => n.classList.remove("hot"));
+        rowHi.setAttribute("visibility", "hidden");
+        return;
+      }
+      svg.setAttribute("data-hot", "1");
+      svg.querySelectorAll("[data-tok]").forEach((n) =>
+        n.classList.toggle("hot", n.getAttribute("data-tok") === String(i)));
+      if (cs && i < gseq - offset) {
+        rowHi.setAttribute("y", gy + (i) * cs);
+        rowHi.setAttribute("visibility", "visible");
+      } else { rowHi.setAttribute("visibility", "hidden"); }
+    }
+    svg.addEventListener("mousemove", (e) => {
+      const t = e.target && e.target.closest ? e.target.closest("[data-tok]") : null;
+      setHot(t ? parseInt(t.getAttribute("data-tok"), 10) : null);
+    });
+    svg.addEventListener("mouseleave", () => setHot(null));
 
     return groups;
   }
