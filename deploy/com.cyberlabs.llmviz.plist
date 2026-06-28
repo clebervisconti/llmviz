@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- LLMViz on the Mac mini. Serves the FastAPI app on 127.0.0.1:8810 with REAL white-box
+     GPT-2 tiers live (NANO/MICRO/SMALL) + Gemma-over-MLX (localhost:8081) as the black-box
+     outputs tier. Reached publicly via the 'agentos' cloudflared tunnel
+     (ingress llmviz.cybersphere.com.br -> localhost:8810).
+
+     IMPORTANT — this follows the AgentOS pattern so it survives reboot despite the app living
+     on the external /Volumes/STORAGE volume:
+       * Installed on the INTERNAL boot volume: /Users/clebervisconti/Library/LaunchAgents/
+       * Uses /usr/bin/python3 (launchd can exec it from /Volumes; the venv's own python hits
+         a TCC denial reading pyvenv.cfg). Heavy deps load from the venv via PYTHONPATH.
+       * wait-for-storage-llmviz.sh blocks until /Volumes/STORAGE is mounted, then exec's.
+
+     Install / activate:
+       cp deploy/com.cyberlabs.llmviz.plist /Users/clebervisconti/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) /Users/clebervisconti/Library/LaunchAgents/com.cyberlabs.llmviz.plist
+     Restart after a code change:
+       launchctl kickstart -k gui/$(id -u)/com.cyberlabs.llmviz -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.cyberlabs.llmviz</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/clebervisconti/bin/wait-for-storage-llmviz.sh</string>
+    <string>/Volumes/STORAGE/Cyberlabs/Web Apps/LLMViz/.venv/bin/python</string>
+    <string>-m</string><string>uvicorn</string>
+    <string>--app-dir</string><string>/Volumes/STORAGE/Cyberlabs/Web Apps/LLMViz</string>
+    <string>app.main:app</string>
+    <string>--host</string><string>127.0.0.1</string>
+    <string>--port</string><string>8810</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/clebervisconti</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key><string>/Volumes/STORAGE/Users/clebervisconti</string>
+    <key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>PYTHONPATH</key><string>/Volumes/STORAGE/Cyberlabs/Web Apps/LLMViz:/Volumes/STORAGE/Cyberlabs/Web Apps/LLMViz/.venv/lib/python3.9/site-packages</string>
+    <key>LLMVIZ_LIVE</key><string>1</string>
+    <key>LLMVIZ_LIVE_TIERS</key><string>nano,micro,small</string>
+    <key>LLMVIZ_MLX_URL</key><string>http://localhost:8081</string>
+    <key>LLMVIZ_MLX_MODEL</key><string>mlx-community/gemma-2-9b-it-4bit</string>
+    <key>HF_HOME</key><string>/Volumes/STORAGE/Cyberlabs/models</string>
+    <key>HF_HUB_CACHE</key><string>/Volumes/STORAGE/Cyberlabs/models</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>/Users/clebervisconti/Library/Logs/llmviz.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/clebervisconti/Library/Logs/llmviz.err.log</string>
+</dict>
+</plist>
