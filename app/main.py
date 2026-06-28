@@ -14,6 +14,7 @@ lock serializes inference so concurrent students can't OOM the 4GB VPS.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from typing import List, Optional
 
@@ -26,19 +27,41 @@ from . import demo_script
 from .internals import MAX_SEQ
 from .model_manager import MANAGER, MODELS_BY_ID, live_enabled, tier_live, torch_available
 
+logger = logging.getLogger("llmviz")
+
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(BASE, "static")
 
-app = FastAPI(title="LLMViz", docs_url=None, redoc_url=None)
+# openapi_url=None: don't publish the machine-readable schema (UIs already disabled). [L2]
+app = FastAPI(title="LLMViz", docs_url=None, redoc_url=None, openapi_url=None)
 
 # Serialize inference: one model run at a time (memory guard).
 _infer_lock = asyncio.Lock()
 
+MAX_API_BODY = 65536   # [M1] reject oversized /api/* request bodies (≫ any legitimate request)
+
+# Content-Security-Policy tuned to what the app actually loads: the Splunk RUM script +
+# beacons, Google Fonts, and inline init/style. Tighten away from 'unsafe-inline' later. [M3]
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' https://cdn.signalfx.com 'unsafe-inline'; "
+    "connect-src 'self' https://*.signalfx.com https://*.observability.splunk.com; "
+    "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; "
+    "font-src 'self' https://fonts.gstatic.com; "
+    "img-src 'self' data:; "
+    "frame-ancestors 'none'; base-uri 'none'"
+)
+
 
 @app.middleware("http")
-async def cache_headers(request, call_next):
-    """index.html must never be cached (so asset-version bumps take effect immediately);
-    versioned /static/* assets and /api responses get sensible caching."""
+async def security_and_cache(request, call_next):
+    """Cache-Control per path + a security-header set + an API request-body size cap."""
+    # [M1] cheap first-line body cap (Pydantic max_length is the real guard post-parse)
+    if request.url.path.startswith("/api/"):
+        cl = request.headers.get("content-length")
+        if cl and cl.isdigit() and int(cl) > MAX_API_BODY:
+            return JSONResponse({"error": "request too large"}, status_code=413)
+
     resp = await call_next(request)
     path = request.url.path
     if path == "/" or path.endswith(".html"):
@@ -47,6 +70,14 @@ async def cache_headers(request, call_next):
         resp.headers["Cache-Control"] = "public, max-age=3600"
     elif path.startswith("/api/"):
         resp.headers["Cache-Control"] = "no-store"
+
+    # [M3] security headers on every response
+    resp.headers["Content-Security-Policy"] = _CSP
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
     return resp
 
 
@@ -60,7 +91,7 @@ class GenerateReq(BaseModel):
     model: str = "demo"
     temperature: float = Field(default=0.8, ge=0.05, le=2.0)
     top_k: int = Field(default=10, ge=1, le=50)
-    generated: List[int] = Field(default_factory=list)
+    generated: List[int] = Field(default_factory=list, max_length=MAX_SEQ)  # [M1] reject early, don't just truncate
     generated_text: str = Field(default="", max_length=4000)   # used by the MLX/GEMMA tier
     head: Optional[int] = None
     focus_layer: Optional[int] = None
@@ -83,19 +114,9 @@ def _is_demo(tier: str) -> bool:
 
 @app.get("/api/health")
 def health():
-    mem_mb = None
-    try:
-        import resource
-        mem_mb = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024)
-    except Exception:
-        pass
-    return {
-        "status": "ok",
-        "torch": torch_available(),
-        "live": live_enabled(),
-        "max_seq": MAX_SEQ,
-        "mem_mb": mem_mb,
-    }
+    # [L3] public payload is liveness only; runtime internals (mem/torch/live) go to Splunk,
+    # not to anonymous callers (they'd let an attacker gauge DoS effectiveness / tier costs).
+    return {"status": "ok"}
 
 
 @app.get("/api/models")
@@ -118,8 +139,9 @@ def tokenize(req: TokenizeReq):
             try:
                 t = mlx_backend.tokenize(req.prompt or " ")
                 return {"tokens": t, "count": len(t), "engine": "mlx"}
-            except Exception as e:  # noqa: BLE001
-                raise HTTPException(502, f"MLX tokenize failed: {e}")
+            except Exception:  # noqa: BLE001
+                logger.exception("MLX tokenize failed")
+                raise HTTPException(502, "tokenizer unavailable")  # [L1] generic to client
     if _use_scripted(req.model):
         t = demo_script.tokenize(req.prompt)
         return {"tokens": t, "count": len(t), "engine": "scripted"}
@@ -127,8 +149,9 @@ def tokenize(req: TokenizeReq):
         from . import inference
         toks = inference.tokenize(req.prompt or " ", req.model)
         return {"tokens": toks, "count": len(toks), "engine": "live"}
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(500, f"tokenize failed: {e}")
+    except Exception:  # noqa: BLE001
+        logger.exception("tokenize failed")
+        raise HTTPException(500, "internal error")  # [L1] generic to client
 
 
 @app.post("/api/generate_step")
@@ -150,8 +173,9 @@ async def generate_step(req: GenerateReq):
                 mlx_backend.generate_step,
                 prompt, req.model, req.temperature, req.top_k, req.generated_text,
             )
-        except Exception as e:  # noqa: BLE001
-            raise HTTPException(502, f"MLX generation failed: {e}")
+        except Exception:  # noqa: BLE001
+            logger.exception("MLX generation failed")
+            raise HTTPException(502, "generation failed")  # [L1] generic to client
         finally:
             _infer_lock.release()
 
@@ -180,8 +204,9 @@ async def generate_step(req: GenerateReq):
         )
         out["engine"] = "live"
         return out
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(500, f"generation failed: {e}")
+    except Exception:  # noqa: BLE001
+        logger.exception("generation failed")
+        raise HTTPException(500, "internal error")  # [L1] generic to client
     finally:
         _infer_lock.release()
 

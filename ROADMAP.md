@@ -143,22 +143,21 @@ VPS — this changes H1/I1 (see notes); the app-level fixes M1–L3 are host-ind
       @system-service, etc.) no longer apply (no systemd); the macOS equivalent is the FDA-scoped agent.
 
 **P2 — app-level DoS & input (host-independent, do in the new build)**
-- [ ] **M1:** cap `GenerateReq.generated: List[int] = Field(default_factory=list, max_length=MAX_SEQ)`
-      (reject early with 422, don't just truncate). Add an ASGI request-body size cap (~64 KB for `/api/*`),
-      or enforce it at the Cloudflare/tunnel edge.
+- [x] **M1:** capped `GenerateReq.generated` with `max_length=MAX_SEQ` (now 422, not silent truncate) +
+      an ASGI `/api/*` request-body cap of 64 KB (`MAX_API_BODY` → 413). *(done 2026-06-28; verified 422/413.)*
 - [ ] **M2:** add per-IP rate limiting (slowapi/Starlette) on `/api/generate_step` + `/api/tokenize`;
       add a Cloudflare rate-limit rule for `/api/*`. (Origin is now a tunnel — not directly reachable, so
       CF-bypass risk is lower than the old VPS, but app-layer throttle is still defense-in-depth.)
 
 **P3 — headers & info disclosure**
-- [ ] **M3:** add a security-headers middleware (CSP allowing `cdn.signalfx.com` + Splunk RUM connect-src,
-      `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, HSTS, `frame-ancestors 'none'`,
-      `Permissions-Policy`). Can also be set at the Cloudflare edge.
-- [ ] **L1:** return generic `"internal error"` on 500/502 paths in `main.py` (log the real exception to
-      Splunk APM, don't leak `{e}` to clients).
-- [ ] **L2:** set `openapi_url=None` in the `FastAPI(...)` constructor (UIs already disabled; schema still public).
-- [ ] **L3:** trim `/api/health` to `{"status":"ok"}` for the public payload; keep `mem_mb`/`torch`/`live`
-      on an internal-only check or Splunk.
+- [x] **M3:** security-headers middleware live (CSP scoped to `cdn.signalfx.com` + Splunk RUM connect-src
+      + Google Fonts, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, HSTS,
+      `frame-ancestors 'none'`, `Permissions-Policy`). *(done 2026-06-28; verify CSP in a real browser console
+      and tighten away from `'unsafe-inline'` next.)*
+- [x] **L1:** 500/502 paths now return generic messages (`internal error` / `generation failed` /
+      `tokenizer unavailable`); real exception goes to `logger.exception(...)` → Splunk APM. *(done 2026-06-28.)*
+- [x] **L2:** `openapi_url=None` set; `/openapi.json` → 404. *(done 2026-06-28; verified.)*
+- [x] **L3:** `/api/health` trimmed to `{"status":"ok"}`. *(done 2026-06-28; verified.)*
 
 **P4 — monitoring / supply-chain (mostly accept + confirm)**
 - [ ] **L4 (accepted):** Splunk RUM ingest token is browser-public by design; monitor `app=llmviz-browser`
