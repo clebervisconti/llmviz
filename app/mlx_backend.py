@@ -103,21 +103,32 @@ def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
     base = _templated_prompt(prompt)
     full = base + (generated_text or "")
 
+    n_top = max(5, min(int(top_k), 20))
     resp = _post("/v1/completions", {
         "model": MLX_MODEL,
         "prompt": full,
         "max_tokens": 1,
         "temperature": float(temperature),
-        "logprobs": max(5, min(int(top_k), 20)),
+        # mlx_lm >= 0.30 uses the OpenAI shape: logprobs=bool + top_logprobs=int.
+        "logprobs": True,
+        "top_logprobs": n_top,
     })
     choice = resp["choices"][0]
-    lp = (choice.get("logprobs") or {}).get("top_logprobs") or [[]]
-    pairs = lp[0] if lp else []          # [[token_id, logprob], ...] for the next token
+    lpobj = choice.get("logprobs") or {}
+
+    # New mlx_lm (>=0.30): logprobs.content[0].top_logprobs = [{id, token, logprob}, ...]
+    # Old mlx_lm (<0.30):  logprobs.top_logprobs = [[[token_id, logprob], ...]]  — keep both.
+    pairs = []
+    content = lpobj.get("content")
+    if content:                                  # new shape
+        pairs = [(e["id"], e["logprob"]) for e in (content[0].get("top_logprobs") or [])]
+    else:                                        # old shape
+        old = lpobj.get("top_logprobs") or [[]]
+        pairs = [(e[0], e[1]) for e in (old[0] if old else [])]
 
     # decode to a probability distribution for the bars
     dist = []
-    for entry in pairs:
-        tid, logprob = entry[0], entry[1]
+    for tid, logprob in pairs:
         dist.append({"id": int(tid), "text": tok.decode([int(tid)]), "p": float(np.exp(logprob))})
     s = sum(d["p"] for d in dist) or 1.0
     for d in dist:

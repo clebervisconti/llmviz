@@ -10,8 +10,16 @@ Q/K/V + attention (GPT-2 family on `torch`/MPS) **and** Gemma-2-9B as a black-bo
   `LLMVIZ_LIVE_TIERS=nano,micro,small`, `LLMVIZ_MLX_URL=http://localhost:8081`.
   Tiers: DEMO (scripted) · NANO distilgpt2 · MICRO gpt2 · SMALL gpt2-medium (all real,
   white-box) · GEMMA gemma-2-9b-it-4bit via MLX (real tokens+probabilities, **no** attention).
-- **Gemma/MLX**: `mlx-watchdog.py` runs `mlx_lm.server` on `127.0.0.1:8081`
-  (model cached at `/Volumes/STORAGE/Cyberlabs/models`).
+- **Gemma/MLX**: `mlx-watchdog.py` runs `mlx_lm.server` on `127.0.0.1:8081` serving
+  **`mlx-community/gemma-3-4b-it-4bit`** (Gemma 3 4B), model cached at
+  `/Volumes/STORAGE/Cyberlabs/models`. **Runs from a dedicated Python 3.11 venv
+  (`/Volumes/STORAGE/Cyberlabs/mlx-venv`, `mlx_lm 0.31.3` / `mlx 0.31.2`)** — the system
+  Python 3.9 tops out at `mlx 0.29.x`, which has a Gemma 3 sliding-window KV-cache bug
+  (`RotatingKVCache._temporal_order` broadcast error). mlx_lm ≥ 0.30 also switched to the
+  OpenAI logprobs shape (`logprobs:true` + `top_logprobs:N`); `app/mlx_backend.py` handles both.
+  Start it: `MLX_MODEL=mlx-community/gemma-3-4b-it-4bit MLX_PORT=8081
+  HF_HUB_CACHE=/Volumes/STORAGE/Cyberlabs/models /Volumes/STORAGE/Cyberlabs/mlx-venv/bin/python
+  /Volumes/STORAGE/Cyberlabs/mlx-watchdog.py`
 - **Tunnel**: `~/.cloudflared/config.yml` ingress `llmviz.cybersphere.com.br → localhost:8810`
   on the `agentos` tunnel (`a2f53637…`). Config backed up to `config.yml.bak.llmviz.*`.
 - **DNS**: `llmviz.cybersphere.com.br` is a proxied CNAME → `a2f53637….cfargotunnel.com`
