@@ -107,13 +107,67 @@ Brings the visual language of poloclub.github.io/transformer-explainer into LLMV
       per-token Q/K/V; `internals.pack_qkv` downsamples to per-token norms + 8-bucket mini-vectors
       (uint8, focus layer only). `GenerateReq.want_qkv` gates it; DEMO synthesizes a matching shape
       (`demo_script._synth_qkv`). Verified shape + payload < 50KB across all tiers (demo/nano/micro/small).
-- [ ] **Frontend: `block_viz.js`** — expanded single block: token column → Q/K/V color strips →
+- [x] **Frontend: `block_viz.js`** — expanded single block: token column → Q/K/V color strips →
       attention grid (Query·Key→softmax) → Out → MLP → residual, connected by Sankey ribbons; head
       selector, block navigator, "+N−1 more identical blocks" stacked-card motif. Overview⇄Block toggle.
-- [ ] **Frontend: probabilities polish + ribbon animation** (sampled-token tag, animated bars, inline
+      Plus continuously-flowing comet ribbons + hover path-tracing (reduced-motion-guarded).
+- [x] **Frontend: probabilities polish + ribbon animation** (sampled-token tag, animated bars, inline
       temperature; all motion reduced-motion-guarded).
 - **Deviation from frozen spec:** UI-SPEC §6 amended (new §6a) to allow a scoped Q/K/V hue triad
       (`--cv-q` violet / `--cv-k` amber / `--cv-v` green) **only** inside the attention sub-view —
       user-approved 2026-06-27. Rest of the app keeps the no-off-brand-colors rule.
-- **Before live:** benchmark `want_qkv` on the VPS NANO/MICRO path before enabling (one extra
-      focus-layer tensor; expected negligible, but confirm RAM/latency). DEMO carries it meanwhile.
+
+## Phase 6.5 — Migrate to Mac mini + Gemma 3  *(done 2026-06-28)*
+- [x] Real white-box models run locally (torch/MPS); the "static" feeling was the missing model
+      (no torch → scripted DEMO). NANO/MICRO/SMALL (distilgpt2/gpt2/gpt2-medium) all live.
+- [x] **Migrated off the VPS to the Mac mini**, served via the existing `agentos` cloudflared tunnel
+      (`llmviz.cybersphere.com.br` → `localhost:8810`; DNS repointed from VPS A-record to tunnel CNAME).
+      VPS `llmviz` systemd service stopped + disabled (port 8802 freed). See `deploy/MAC-MINI.md`.
+- [x] **GEMMA tier = Gemma 3 4B** (`mlx-community/gemma-3-4b-it-4bit`) via a dedicated Python 3.11
+      MLX venv (`mlx_lm 0.31.3`; Py3.9 capped at the buggy `mlx 0.29.x`). `mlx_backend.py` handles the
+      new OpenAI logprobs API. Gemma 2 9B removed from cache. Black-box (tokens+probs, no attention).
+- ⚠️ **Boot-persistence pending one manual step:** launchd is TCC-denied on `/Volumes/STORAGE/Cyberlabs`,
+      so the installed launchd agents need a **Full Disk Access** grant on the Python binary to auto-start
+      (steps in `deploy/MAC-MINI.md`). Until then the app + MLX run in-session.
+
+## Phase 7 — Security hardening  *(planned — next release; from cs-red-team assessment 2026-06-28)*
+Source: `outputs/cs-red-team/2026-06-28-110229/.../SECURITY-ASSESSMENT.md`. No injection/auth vulns found;
+risk is operational (least-privilege + DoS + headers). **Context: the app now runs on the Mac mini, not the
+VPS — this changes H1/I1 (see notes); the app-level fixes M1–L3 are host-independent and still apply.**
+
+**P1 — host / least-privilege**
+- [ ] **H1 (was High, now reduced):** the VPS root service is decommissioned. On the Mac mini the app runs
+      as the `clebervisconti` user (not root) under launchd — already much better. Remaining: run under a
+      dedicated low-priv user if feasible, and confirm the launchd job has no unnecessary privileges. The
+      systemd hardening directives (NoNewPrivileges, ProtectSystem=strict, PrivateTmp, SystemCallFilter=
+      @system-service, etc.) no longer apply (no systemd); the macOS equivalent is the FDA-scoped agent.
+
+**P2 — app-level DoS & input (host-independent, do in the new build)**
+- [ ] **M1:** cap `GenerateReq.generated: List[int] = Field(default_factory=list, max_length=MAX_SEQ)`
+      (reject early with 422, don't just truncate). Add an ASGI request-body size cap (~64 KB for `/api/*`),
+      or enforce it at the Cloudflare/tunnel edge.
+- [ ] **M2:** add per-IP rate limiting (slowapi/Starlette) on `/api/generate_step` + `/api/tokenize`;
+      add a Cloudflare rate-limit rule for `/api/*`. (Origin is now a tunnel — not directly reachable, so
+      CF-bypass risk is lower than the old VPS, but app-layer throttle is still defense-in-depth.)
+
+**P3 — headers & info disclosure**
+- [ ] **M3:** add a security-headers middleware (CSP allowing `cdn.signalfx.com` + Splunk RUM connect-src,
+      `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, HSTS, `frame-ancestors 'none'`,
+      `Permissions-Policy`). Can also be set at the Cloudflare edge.
+- [ ] **L1:** return generic `"internal error"` on 500/502 paths in `main.py` (log the real exception to
+      Splunk APM, don't leak `{e}` to clients).
+- [ ] **L2:** set `openapi_url=None` in the `FastAPI(...)` constructor (UIs already disabled; schema still public).
+- [ ] **L3:** trim `/api/health` to `{"status":"ok"}` for the public payload; keep `mem_mb`/`torch`/`live`
+      on an internal-only check or Splunk.
+
+**P4 — monitoring / supply-chain (mostly accept + confirm)**
+- [ ] **L4 (accepted):** Splunk RUM ingest token is browser-public by design; monitor `app=llmviz-browser`
+      ingest volume for anomalies; rotate if abused.
+- [ ] **I1 (changed):** the VPS root auto-deploy chain is gone (VPS decommissioned). The Mac mini serves
+      from the local repo; re-evaluate the new deploy trust model (the `.claude` sync hook + how the Mac
+      picks up changes). Keep branch protection + 2FA on the public GitHub repo.
+- [ ] **deps:** pin torch/transformers (currently `>=`); add `pip-audit`/Dependabot. (Note: transformers
+      was bumped to 4.53 + a Py3.11 `mlx_lm 0.31.3` venv added during the Gemma 3 switch — re-pin both.)
+- **I2 (info, no action):** LLM prompt-injection impact is negligible — base GPT-2, no tools/agency; the
+      GEMMA tier returns display-only text. (The separate Hermes-agent MLX proxy is where injection should
+      be assessed — out of scope for LLMViz.)
