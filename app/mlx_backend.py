@@ -104,6 +104,9 @@ def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
     full = base + (generated_text or "")
 
     n_top = max(5, min(int(top_k), 20))
+    # A 1-token completion returns in ~1-2s; cap at 25s so a hung/restarting MLX server
+    # surfaces a fast error instead of holding the single inference lock for minutes
+    # (which makes the UI look frozen — "nothing happens"). The watchdog restarts MLX.
     resp = _post("/v1/completions", {
         "model": MLX_MODEL,
         "prompt": full,
@@ -112,7 +115,7 @@ def generate_step(prompt: str, tier: str, temperature: float, top_k: int,
         # mlx_lm >= 0.30 uses the OpenAI shape: logprobs=bool + top_logprobs=int.
         "logprobs": True,
         "top_logprobs": n_top,
-    })
+    }, timeout=25)
     choice = resp["choices"][0]
     lpobj = choice.get("logprobs") or {}
 
